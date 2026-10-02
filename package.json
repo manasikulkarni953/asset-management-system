@@ -3,18 +3,29 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -H 0.0.0.0",
+    "dev:network": "next dev -H 0.0.0.0",
+    "dev:https": "node scripts/generate-dev-cert.js && next dev --experimental-https --experimental-https-key ./certificates/dev-key.pem --experimental-https-cert ./certificates/dev-cert.pem -H 0.0.0.0 -p 3000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "html5-qrcode": "^2.3.8",
+    "jose": "^6.2.12",
+    "jsbarcode": "^3.12.3",
+    "lucide-react": "^1.49.0",
+    "mysql2": "^3.24.5",
     "next": "16.3.7",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsbarcode": "^3.11.4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
