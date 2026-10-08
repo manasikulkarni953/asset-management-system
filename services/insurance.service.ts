@@ -267,4 +267,14 @@ export class InsuranceService {
     const saved = await this.getInsuranceByAssetId(assetId);
     return saved!;
   }
+
+  static async deleteInsurance(id: number): Promise<boolean> {
+    const res = await execute('DELETE FROM asset_insurance WHERE id = ?', [id]);
+    return ((res as any)?.affectedRows || 0) > 0;
+  }
+
+  static async deleteInsuranceByAssetId(assetId: number): Promise<boolean> {
+    const res = await execute('DELETE FROM asset_insurance WHERE asset_id = ?', [assetId]);
+    return ((res as any)?.affectedRows || 0) > 0;
+  }
 }

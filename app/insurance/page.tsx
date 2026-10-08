@@ -42,6 +42,11 @@ export default function InsurancePage() {
   const [modalError, setModalError] = useState<string | null>(null);
   const [assets, setAssets] = useState<any[]>([]);
 
+  // Delete modal state
+  const [policyToDelete, setPolicyToDelete] = useState<AssetInsurance | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   const today = new Date().toISOString().split('T')[0];
   const nextYear = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
@@ -129,6 +134,32 @@ export default function InsurancePage() {
   const openDetailsModal = (policy: AssetInsurance) => {
     setSelectedPolicy(policy);
     setIsDetailsModalOpen(true);
+  };
+
+  const openDeleteModal = (policy: AssetInsurance) => {
+    setDeleteError(null);
+    setPolicyToDelete(policy);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!policyToDelete) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/insurance/${policyToDelete.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete insurance policy');
+      }
+      setPolicyToDelete(null);
+      fetchInsurance();
+    } catch (err: any) {
+      setDeleteError(err.message || 'Error deleting insurance policy');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleSavePolicy = async (e: React.FormEvent) => {
@@ -269,7 +300,7 @@ export default function InsurancePage() {
       header: 'Actions',
       align: 'right',
       render: (row) => (
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex items-center justify-end gap-1.5">
           <Button
             variant="ghost"
             size="sm"
@@ -286,6 +317,17 @@ export default function InsurancePage() {
           >
             Edit
           </Button>
+          <button
+            type="button"
+            onClick={() => openDeleteModal(row)}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer border border-transparent hover:border-rose-200 dark:hover:border-rose-900/40"
+            title="Delete Insurance Policy"
+            aria-label="Delete Insurance Policy"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
         </div>
       ),
     },
@@ -635,28 +677,98 @@ export default function InsurancePage() {
               </p>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800">
               <Button
-                variant="outline"
+                variant="danger"
                 size="sm"
                 onClick={() => {
                   setIsDetailsModalOpen(false);
-                  openEditModal(selectedPolicy);
+                  openDeleteModal(selectedPolicy);
                 }}
               >
-                Edit Policy
+                Delete Policy
               </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => setIsDetailsModalOpen(false)}
-              >
-                Close
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setIsDetailsModalOpen(false);
+                    openEditModal(selectedPolicy);
+                  }}
+                >
+                  Edit Policy
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => setIsDetailsModalOpen(false)}
+                >
+                  Close
+                </Button>
+              </div>
             </div>
           </div>
         </Modal>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={!!policyToDelete}
+        onClose={() => {
+          if (!isDeleting) {
+            setPolicyToDelete(null);
+            setDeleteError(null);
+          }
+        }}
+        title="Delete Insurance Policy"
+        description="Are you sure you want to permanently delete this insurance policy?"
+        size="sm"
+        footer={
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPolicyToDelete(null);
+                setDeleteError(null);
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleConfirmDelete}
+              isLoading={isDeleting}
+            >
+              Delete Policy
+            </Button>
+          </div>
+        }
+      >
+        {policyToDelete && (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              You are about to delete insurance policy{' '}
+              <strong className="font-mono text-slate-900 dark:text-white">
+                {policyToDelete.policy_number}
+              </strong>{' '}
+              ({policyToDelete.provider}) linked to asset{' '}
+              <strong className="font-mono text-blue-600 dark:text-blue-400">
+                {policyToDelete.asset_number}
+              </strong>.
+            </p>
+            <div className="p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 text-xs text-rose-700 dark:text-rose-300">
+              ⚠️ <strong>Warning:</strong> This action cannot be undone. The warranty and insurance protection record for this equipment will be permanently removed.
+            </div>
+            {deleteError && (
+              <p className="text-xs text-rose-600 dark:text-rose-400 font-semibold">{deleteError}</p>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

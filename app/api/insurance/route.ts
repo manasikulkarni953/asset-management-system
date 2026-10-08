@@ -88,3 +88,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error?.message || 'Failed to update insurance details' }, { status: 400 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const user = await getAuthUserFromRequest(req);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (!Permissions.canManageInsurance(user)) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient privileges' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+    const assetId = searchParams.get('asset_id');
+
+    if (!id && !assetId) {
+      return NextResponse.json({ error: 'Missing insurance policy ID or asset ID' }, { status: 400 });
+    }
+
+    let deleted = false;
+    if (id) {
+      deleted = await InsuranceService.deleteInsurance(Number(id));
+    } else if (assetId) {
+      deleted = await InsuranceService.deleteInsuranceByAssetId(Number(assetId));
+    }
+
+    if (!deleted) {
+      return NextResponse.json({ error: 'Insurance policy not found or already deleted' }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Insurance policy deleted successfully',
+    });
+  } catch (error: any) {
+    console.error('API /insurance DELETE error:', error);
+    return NextResponse.json({ error: error?.message || 'Failed to delete insurance policy' }, { status: 500 });
+  }
+}
