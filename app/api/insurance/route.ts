@@ -10,8 +10,24 @@ export async function GET(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized: Authentication required.' }, { status: 401 });
     }
-    if (!Permissions.canManageInsurance(user)) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient privileges' }, { status: 403 });
+
+    let employeeId: number | undefined = undefined;
+
+    // Role-based data isolation: employees only receive insurance for their assigned equipment
+    if (user.role === 'employee') {
+      const { EmployeeService } = await import('@/services/employee.service');
+      const ownEmp = await EmployeeService.getEmployeeByUser(user);
+      if (!ownEmp) {
+        return NextResponse.json({
+          success: true,
+          insuranceList: [],
+          total: 0,
+          stats: { totalInsured: 0, activePolicies: 0, expiringSoon: 0, expiredPolicies: 0 },
+          page: 1,
+          limit: 20,
+        });
+      }
+      employeeId = ownEmp.id;
     }
 
     const { searchParams } = new URL(req.url);
@@ -25,6 +41,7 @@ export async function GET(req: NextRequest) {
       status,
       page,
       limit,
+      employeeId,
     });
 
     return NextResponse.json({
@@ -56,18 +73,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON request payload' }, { status: 400 });
     }
 
-    const assetId = Number(body.asset_id);
-    if (!assetId || isNaN(assetId)) {
-      return NextResponse.json({ error: 'Valid asset_id is required' }, { status: 400 });
-    }
-
     const validated = insuranceSchema.parse(body);
-    const insurance = await InsuranceService.upsertInsurance(assetId, validated);
+    const insurance = await InsuranceService.upsertInsurance(validated.asset_id, validated);
 
     return NextResponse.json({
       success: true,
       insurance,
-      message: 'Insurance details updated successfully',
+      message: 'Insurance policy saved successfully',
     });
   } catch (error: any) {
     if (error?.name === 'ZodError') {

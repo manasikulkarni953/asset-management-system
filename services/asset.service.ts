@@ -54,7 +54,7 @@ export class AssetService {
     const countRows = await query<any>(
       `SELECT COUNT(*) as total 
        FROM assets a 
-       LEFT JOIN employees e ON a.current_employee_id = e.id
+       LEFT JOIN employee e ON a.current_employee_id = e.id
        WHERE ${whereClause}`,
       params
     );
@@ -72,15 +72,18 @@ export class AssetService {
         a.purchase_date,
         a.purchase_cost,
         a.vendor,
+        a.vendor_phone,
+        a.vendor_email,
+        a.location,
         a.warranty_expiry,
         a.status,
         a.current_employee_id,
-        e.name as current_employee_name,
-        e.employee_id as current_employee_code,
+        COALESCE(e.name, e.full_name) as current_employee_name,
+        COALESCE(e.employee_id, CONCAT('TGS-', LPAD(e.id, 3, '0'))) as current_employee_code,
         a.created_at,
         a.updated_at
        FROM assets a
-       LEFT JOIN employees e ON a.current_employee_id = e.id
+       LEFT JOIN employee e ON a.current_employee_id = e.id
        WHERE ${whereClause}
        ORDER BY a.id DESC
        LIMIT ? OFFSET ?`,
@@ -103,15 +106,18 @@ export class AssetService {
         a.purchase_date,
         a.purchase_cost,
         a.vendor,
+        a.vendor_phone,
+        a.vendor_email,
+        a.location,
         a.warranty_expiry,
         a.status,
         a.current_employee_id,
-        e.name as current_employee_name,
-        e.employee_id as current_employee_code,
+        COALESCE(e.name, e.full_name) as current_employee_name,
+        COALESCE(e.employee_id, CONCAT('TGS-', LPAD(e.id, 3, '0'))) as current_employee_code,
         a.created_at,
         a.updated_at
        FROM assets a
-       LEFT JOIN employees e ON a.current_employee_id = e.id
+       LEFT JOIN employee e ON a.current_employee_id = e.id
        WHERE a.id = ?
        LIMIT 1`,
       [id]
@@ -143,16 +149,16 @@ export class AssetService {
         aa.id,
         aa.asset_id,
         aa.employee_id,
-        e.name as employee_name,
-        e.employee_id as employee_code,
-        e.department as employee_department,
+        COALESCE(e.name, e.full_name) as employee_name,
+        COALESCE(e.employee_id, CONCAT('TGS-', LPAD(e.id, 3, '0'))) as employee_code,
+        COALESCE(e.department, 'Operations') as employee_department,
         aa.assigned_date,
         aa.returned_date,
         aa.status,
         aa.notes,
         u.full_name as assigned_by_name
        FROM asset_assignments aa
-       JOIN employees e ON aa.employee_id = e.id
+       JOIN employee e ON aa.employee_id = e.id
        LEFT JOIN users u ON aa.assigned_by_user_id = u.id
        WHERE aa.asset_id = ?
        ORDER BY aa.id DESC`,
@@ -168,9 +174,9 @@ export class AssetService {
         t.priority,
         t.status,
         t.created_at,
-        e.name as employee_name
+        COALESCE(e.name, e.full_name) as employee_name
        FROM tickets t
-       JOIN employees e ON t.employee_id = e.id
+       JOIN employee e ON t.employee_id = e.id
        WHERE t.asset_id = ?
        ORDER BY t.id DESC`,
       [id]
@@ -260,9 +266,9 @@ export class AssetService {
       const [res] = await conn.execute(
         `INSERT INTO assets (
           asset_id, asset_number, category, brand, model, serial_number, 
-          purchase_date, purchase_cost, vendor, warranty_expiry, 
-          status, current_employee_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          purchase_date, purchase_cost, vendor, vendor_phone, vendor_email, location,
+          warranty_expiry, status, current_employee_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           assetId,
           assetNumber,
@@ -273,6 +279,9 @@ export class AssetService {
           data.purchase_date,
           data.purchase_cost,
           data.vendor.trim(),
+          data.vendor_phone ? data.vendor_phone.trim() : null,
+          data.vendor_email ? data.vendor_email.trim() : null,
+          data.location ? data.location.trim() : 'The Space',
           data.warranty_expiry || null,
           initialStatus,
           data.current_employee_id || null,
@@ -297,7 +306,7 @@ export class AssetService {
         );
 
         const [empRows] = await conn.query<any[]>(
-          'SELECT name, employee_id FROM employees WHERE id = ?',
+          'SELECT COALESCE(name, full_name) as name, employee_id FROM employee WHERE id = ?',
           [data.current_employee_id]
         );
         const empName = empRows[0]?.name || 'Employee';
@@ -344,6 +353,9 @@ export class AssetService {
     if (data.purchase_date !== undefined) { updates.push('purchase_date = ?'); params.push(data.purchase_date); }
     if (data.purchase_cost !== undefined) { updates.push('purchase_cost = ?'); params.push(data.purchase_cost); }
     if (data.vendor !== undefined) { updates.push('vendor = ?'); params.push(data.vendor); }
+    if (data.vendor_phone !== undefined) { updates.push('vendor_phone = ?'); params.push(data.vendor_phone ? data.vendor_phone.trim() : null); }
+    if (data.vendor_email !== undefined) { updates.push('vendor_email = ?'); params.push(data.vendor_email ? data.vendor_email.trim() : null); }
+    if (data.location !== undefined) { updates.push('location = ?'); params.push(data.location ? data.location.trim() : null); }
     if (data.warranty_expiry !== undefined) { updates.push('warranty_expiry = ?'); params.push(data.warranty_expiry || null); }
     if (data.status !== undefined) { updates.push('status = ?'); params.push(data.status); }
 
@@ -386,6 +398,23 @@ export class AssetService {
     });
   }
 
+  static async deleteAsset(id: number): Promise<void> {
+    await withTransaction(async (conn) => {
+      // 1. Delete associated network config
+      await conn.execute('DELETE FROM asset_network WHERE asset_id = ?', [id]);
+      // 2. Delete associated insurance
+      await conn.execute('DELETE FROM asset_insurance WHERE asset_id = ?', [id]);
+      // 3. Nullify tickets referencing this asset
+      await conn.execute('UPDATE tickets SET asset_id = NULL WHERE asset_id = ?', [id]);
+      // 4. Delete assignment history
+      await conn.execute('DELETE FROM asset_assignments WHERE asset_id = ?', [id]);
+      // 5. Delete asset history
+      await conn.execute('DELETE FROM asset_history WHERE asset_id = ?', [id]);
+      // 6. Delete asset record
+      await conn.execute('DELETE FROM assets WHERE id = ?', [id]);
+    });
+  }
+
   static async getAssetHistory(assetId: number): Promise<AssetHistory[]> {
     return query<AssetHistory>(
       `SELECT 
@@ -409,7 +438,23 @@ export class AssetService {
     const rows = await query<{ category: string }>(
       'SELECT DISTINCT category FROM assets WHERE category IS NOT NULL AND category != "" ORDER BY category ASC'
     );
-    const defaults = ['Laptop', 'Desktop', 'Monitor', 'Server', 'Mobile', 'Tablet', 'Printer', 'Networking'];
+    const defaults = [
+      'CPU',
+      'Monitor',
+      'Laptop',
+      'Headset',
+      'Keyboard',
+      'Mouse',
+      'HDMI',
+      'Power Cable',
+      'Power Adapter',
+      'Router',
+      'Gigswitch',
+      'Webcam',
+      'CCTV',
+      'Chair',
+      'Printer',
+    ];
     const existing = rows.map((r) => r.category);
     return Array.from(new Set([...defaults, ...existing]));
   }

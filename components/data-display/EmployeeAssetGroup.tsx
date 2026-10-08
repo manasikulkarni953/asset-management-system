@@ -28,6 +28,7 @@ import {
   Briefcase,
   MapPin,
   Tag,
+  Wrench,
   ShieldCheck,
   AlertCircle,
   Clock,
@@ -55,6 +56,7 @@ export interface EmployeeAssetGroupProps {
  */
 function getCategoryIcon(category: string = '') {
   const cat = category.toLowerCase().trim();
+  if (cat.includes('cpu')) return Cpu;
   if (cat.includes('laptop') || cat.includes('notebook')) return Laptop;
   if (cat.includes('monitor') || cat.includes('screen') || cat.includes('display')) return Monitor;
   if (cat.includes('keyboard')) return Keyboard;
@@ -328,6 +330,20 @@ export function EmployeeAssetGroup({
                           icon={<ExternalLink className="w-3 h-3 text-slate-500" />}
                         >
                           View Asset
+                        </Button>
+                      </Link>
+
+                      <Link
+                        href={`/damaged-assets`}
+                      >
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-[11px] px-2 border-amber-200 text-amber-700 hover:bg-amber-50"
+                          icon={<Wrench className="w-3 h-3 text-amber-600" />}
+                          title="Move to Repair"
+                        >
+                          Repair
                         </Button>
                       </Link>
 

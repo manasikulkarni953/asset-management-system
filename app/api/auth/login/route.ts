@@ -50,11 +50,27 @@ export async function POST(req: NextRequest) {
     // Ensure default admin exists if first run
     try {
       await AuthService.ensureDefaultAdmin();
-    } catch (e) {
-      console.warn('DB check during admin ensure:', e);
+    } catch (e: any) {
+      console.warn('[LOGIN_API] DB check during admin ensure encountered warning:', e?.message);
     }
 
-    const user = await AuthService.login(cleanIdentifier, password);
+    let user;
+    try {
+      user = await AuthService.login(cleanIdentifier, password);
+    } catch (dbError: any) {
+      console.error('[LOGIN_API] Database query/connection error during authentication:', {
+        code: dbError?.code,
+        errno: dbError?.errno,
+        sqlState: dbError?.sqlState,
+        message: dbError?.message,
+      });
+
+      return NextResponse.json(
+        { error: 'Authentication service temporarily unavailable. Please try again shortly.' },
+        { status: 503 }
+      );
+    }
+
     if (!user) {
       return NextResponse.json(
         { error: 'Invalid username/email or password.' },
@@ -93,7 +109,10 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error: any) {
-    console.error('Login error:', error);
+    console.error('[LOGIN_API] Unexpected error in login route:', {
+      name: error?.name,
+      message: error?.message,
+    });
     return NextResponse.json(
       { error: 'Authentication service encountered an unexpected error.' },
       { status: 500 }

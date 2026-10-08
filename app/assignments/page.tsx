@@ -11,9 +11,8 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Input } from '@/components/ui/Input';
-import { Textarea } from '@/components/ui/Textarea';
 import { AssetAssignment } from '@/types/assignment';
-import { formatDate } from '@/lib/utils';
+import { formatDate, cn } from '@/lib/utils';
 import {
   CheckCircle2,
   AlertCircle,
@@ -72,7 +71,7 @@ export default function AssignmentsPage() {
 
   // Single Transfer & Return form states
   const [transferForm, setTransferForm] = useState({ asset_id: '', to_employee_id: '', notes: '' });
-  const [returnForm, setReturnForm] = useState({ asset_id: '', notes: '' });
+  const [returnForm, setReturnForm] = useState({ asset_id: '', return_to: 'itadmin', notes: '' });
   const [permissionError, setPermissionError] = useState<string | null>(null);
 
   const fetchAssignments = useCallback(async () => {
@@ -195,6 +194,62 @@ export default function AssignmentsPage() {
     return activeEmployees.find((e) => String(e.id) === String(assignEmployeeId));
   }, [activeEmployees, assignEmployeeId]);
 
+  // Options for return modal ensuring active, transferred, or pre-selected assets appear
+  const returnAssetOptions = useMemo(() => {
+    const list: Array<{ value: string | number; label: string }> = [
+      { value: '', label: '-- Choose Assigned Asset --' },
+    ];
+    const map = new Map<number, string>();
+    assignedAssets.forEach((a) => {
+      map.set(Number(a.id), `${a.asset_number} (${a.model || ''}) — Currently with: ${a.employee_name}`);
+    });
+
+    if (returnForm.asset_id && !map.has(Number(returnForm.asset_id))) {
+      const match = assignments.find((a) => Number(a.asset_id) === Number(returnForm.asset_id));
+      if (match) {
+        map.set(
+          Number(match.asset_id),
+          `${match.asset_number} (${match.asset_model || ''}) — Custodian: ${match.employee_name || 'Assigned'}`
+        );
+      }
+    }
+
+    map.forEach((lbl, id) => {
+      list.push({ value: id, label: lbl });
+    });
+    return list;
+  }, [assignedAssets, returnForm.asset_id, assignments]);
+
+  // Options for transfer modal ensuring active, transferred, or returned assets appear
+  const transferAssetOptions = useMemo(() => {
+    const list: Array<{ value: string | number; label: string }> = [
+      { value: '', label: '-- Choose Asset to Transfer --' },
+    ];
+    const map = new Map<number, string>();
+    assignedAssets.forEach((a) => {
+      map.set(Number(a.id), `${a.asset_number} (${a.model || ''}) — Currently with: ${a.employee_name}`);
+    });
+
+    if (transferForm.asset_id && !map.has(Number(transferForm.asset_id))) {
+      const match = assignments.find((a) => Number(a.asset_id) === Number(transferForm.asset_id));
+      if (match) {
+        const fromLabel =
+          match.status === 'returned'
+            ? 'Central Inventory (Returned)'
+            : match.employee_name || 'Custodian';
+        map.set(
+          Number(match.asset_id),
+          `${match.asset_number} (${match.asset_model || ''}) — Source: ${fromLabel}`
+        );
+      }
+    }
+
+    map.forEach((lbl, id) => {
+      list.push({ value: id, label: lbl });
+    });
+    return list;
+  }, [assignedAssets, transferForm.asset_id, assignments]);
+
   // Submit multi-asset assignment
   const handleAssignSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,7 +273,7 @@ export default function AssignmentsPage() {
           action: 'assign',
           employeeId: Number(assignEmployeeId),
           assetIds: selectedAssetIds,
-          remarks: assignNotes ? `${assignNotes} (Condition: ${assignCondition})` : `Condition: ${assignCondition}`,
+          remarks: assignCondition ? `Condition: ${assignCondition}` : undefined,
         }),
       });
 
@@ -286,14 +341,15 @@ export default function AssignmentsPage() {
         body: JSON.stringify({
           action: 'return',
           asset_id: Number(returnForm.asset_id),
-          notes: returnForm.notes,
+          return_to: returnForm.return_to,
+          notes: returnForm.notes || 'Returned to IT Admin',
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to return asset');
 
       setActiveModal(null);
-      setReturnForm({ asset_id: '', notes: '' });
+      setReturnForm({ asset_id: '', return_to: 'itadmin', notes: '' });
       fetchAssignments();
     } catch (err: any) {
       setModalError(err.message);
@@ -309,24 +365,50 @@ export default function AssignmentsPage() {
   };
 
   const openReturnForAsset = (assetId: number) => {
-    setReturnForm({ asset_id: String(assetId), notes: '' });
+    setReturnForm({ asset_id: String(assetId), return_to: 'itadmin', notes: '' });
     setModalError(null);
     setActiveModal('return');
+  };
+
+  const getAllocationType = (row: AssetAssignment) => {
+    const note = (row.notes || '').toLowerCase();
+    if (row.status === 'transferred' || note.includes('transferred') || note.includes('transfer')) {
+      return {
+        label: 'Transfer Allocation',
+        color: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800',
+      };
+    }
+    if (note.includes('temporary') || note.includes('loaner')) {
+      return {
+        label: 'Temporary Allocation',
+        color: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800',
+      };
+    }
+    if (note.includes('primary') || note.includes('initial') || note.includes('onboarding') || note.includes('new joiner')) {
+      return {
+        label: 'Primary Allocation',
+        color: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800',
+      };
+    }
+    return {
+      label: 'Direct Allocation',
+      color: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800',
+    };
   };
 
   const columns: Column<AssetAssignment>[] = [
     {
       key: 'asset_number',
-      header: 'Asset Identity',
+      header: 'ASSET',
       render: (row) => (
         <div>
           <Link
             href={`/assets/${row.asset_id}`}
-            className="font-mono font-bold text-blue-600 hover:text-blue-800 hover:underline block text-xs"
+            className="font-mono font-bold text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline block text-xs"
           >
             {row.asset_number}
           </Link>
-          <span className="text-[11px] text-slate-500">
+          <span className="text-[11px] text-slate-500 dark:text-slate-400">
             {row.asset_brand} {row.asset_model}
           </span>
         </div>
@@ -334,94 +416,140 @@ export default function AssignmentsPage() {
     },
     {
       key: 'employee_name',
-      header: 'Employee Custodian',
+      header: 'EMPLOYEE / CUSTODIAN',
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <Link
             href={`/employees/${row.employee_id}`}
-            className="font-bold text-slate-900 hover:text-blue-600 hover:underline block text-xs"
+            className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 hover:underline block text-xs"
           >
             {row.employee_name || 'Unassigned'}
           </Link>
-          <div className="text-[11px] text-slate-500 font-mono flex items-center gap-1.5">
-            <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-semibold border border-slate-200 text-[10px]">
+          <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1.5">
+            <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold border border-slate-200 dark:border-slate-700 text-[10px]">
               {row.employee_code || `EMP-${row.employee_id}`}
             </span>
-            {row.employee_department && (
-              <span>• {row.employee_department}</span>
-            )}
           </div>
         </div>
       ),
     },
     {
-      key: 'status',
-      header: 'Status',
-      render: (row) => <StatusBadge status={row.status} size="sm" />,
+      key: 'allocation_type',
+      header: 'ALLOCATION TYPE',
+      render: (row) => {
+        const typeInfo = getAllocationType(row);
+        return (
+          <span
+            className={cn(
+              'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border tracking-wide whitespace-nowrap',
+              typeInfo.color
+            )}
+          >
+            {typeInfo.label}
+          </span>
+        );
+      },
     },
     {
       key: 'assigned_date',
-      header: 'Assigned Date',
+      header: 'ALLOCATED DATE',
       render: (row) => (
-        <span className="text-xs text-slate-600 font-mono">
+        <span className="text-xs text-slate-600 dark:text-slate-300 font-mono">
           {formatDate(row.assigned_date)}
         </span>
       ),
     },
     {
       key: 'returned_date',
-      header: 'Returned Date',
+      header: 'RETURNED DATE',
       render: (row) => (
         <span className="text-xs font-mono">
           {row.returned_date ? (
-            <span className="text-slate-500">{formatDate(row.returned_date)}</span>
+            <span className="text-slate-500 dark:text-slate-400">{formatDate(row.returned_date)}</span>
           ) : (
-            <span className="text-emerald-700 font-semibold">Active Custody</span>
+            <span className="text-emerald-700 dark:text-emerald-400 font-semibold">Active Custody</span>
           )}
         </span>
       ),
     },
     {
-      key: 'notes',
-      header: 'Notes / Purpose',
-      render: (row) => (
-        <span
-          className="text-xs text-slate-500 italic max-w-xs truncate block"
-          title={row.notes || ''}
-        >
-          {row.notes || '—'}
-        </span>
-      ),
+      key: 'status',
+      header: 'STATUS',
+      render: (row) => <StatusBadge status={row.status} size="sm" />,
     },
     {
       key: 'actions',
-      header: 'Actions',
+      header: 'ACTIONS',
       align: 'right',
-      render: (row) =>
-        row.status === 'assigned' && !row.returned_date ? (
-          <div className="flex items-center justify-end gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => openTransferForAsset(row.asset_id)}
-              className="text-xs px-2.5 py-1"
-              icon={<ArrowRightLeft className="w-3 h-3" />}
-            >
-              Transfer
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openReturnForAsset(row.asset_id)}
-              className="text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 px-2 py-1"
-              icon={<RotateCcw className="w-3 h-3" />}
-            >
-              Return
-            </Button>
-          </div>
-        ) : (
-          <span className="text-xs text-slate-400 dark:text-zinc-500 italic">Archived</span>
-        ),
+      render: (row) => {
+        const isAssigned = row.status === 'assigned' && !row.returned_date;
+        const isTransferred = row.status === 'transferred';
+        const isReturned =
+          row.status === 'returned' || (row.status as string) === 'refund';
+
+        if (isAssigned) {
+          return (
+            <div className="flex items-center justify-end gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openTransferForAsset(row.asset_id)}
+                className="text-xs px-2.5 py-1"
+                icon={<ArrowRightLeft className="w-3 h-3" />}
+              >
+                Transfer
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openReturnForAsset(row.asset_id)}
+                className="text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 px-2 py-1"
+                icon={<RotateCcw className="w-3 h-3" />}
+              >
+                Return
+              </Button>
+            </div>
+          );
+        }
+
+        if (isTransferred) {
+          return (
+            <div className="flex items-center justify-end gap-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => openReturnForAsset(row.asset_id)}
+                className="text-xs text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 px-2.5 py-1 font-medium border border-rose-200/80 dark:border-rose-900/50"
+                icon={<RotateCcw className="w-3 h-3" />}
+              >
+                Return
+              </Button>
+            </div>
+          );
+        }
+
+        if (isReturned) {
+          return (
+            <div className="flex items-center justify-end gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openTransferForAsset(row.asset_id)}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 px-2.5 py-1 font-medium border border-blue-200/80 dark:border-blue-900/50"
+                icon={<ArrowRightLeft className="w-3 h-3" />}
+              >
+                Transfer
+              </Button>
+            </div>
+          );
+        }
+
+        return (
+          <span className="text-xs text-slate-400 dark:text-zinc-500 italic">
+            Archived
+          </span>
+        );
+      },
     },
   ];
 
@@ -431,21 +559,14 @@ export default function AssignmentsPage() {
         title="Asset Custody & Assignments"
         description="Comprehensive audit trail of hardware allocations, custodian transfers, and returns across the enterprise."
         action={
-          <div className="flex items-center gap-2">
-            <Link href="/scan">
-              <Button variant="outline" size="sm">
-                Scan Barcode
-              </Button>
-            </Link>
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={openAssignModal}
-              icon={<Plus className="w-4 h-4" />}
-            >
-              Assign Assets
-            </Button>
-          </div>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={openAssignModal}
+            icon={<Plus className="w-4 h-4" />}
+          >
+            Assign Assets
+          </Button>
         }
       />
 
@@ -589,7 +710,7 @@ export default function AssignmentsPage() {
                 { value: '', label: '-- Choose Employee Custodian --' },
                 ...activeEmployees.map((e) => ({
                   value: e.id,
-                  label: `${e.name} (${e.employee_id}) — ${e.department}`,
+                  label: `${e.name} (${e.employee_id})`,
                 })),
               ]}
               value={assignEmployeeId}
@@ -605,10 +726,6 @@ export default function AssignmentsPage() {
                   </span>
                   <span className="text-slate-600 font-mono">
                     ({selectedEmployeeObj.employee_id})
-                  </span>
-                  <span className="text-slate-400">•</span>
-                  <span className="text-slate-700">
-                    {selectedEmployeeObj.department}
                   </span>
                 </div>
                 <Link
@@ -747,8 +864,8 @@ export default function AssignmentsPage() {
             </div>
           </div>
 
-          {/* STEP 3 & 4: Assignment Details & Remarks */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-200">
+          {/* STEP 3: Asset Condition */}
+          <div className="pt-2 border-t border-slate-200">
             <div>
               <label className="text-xs font-semibold text-slate-700 block mb-1">
                 Asset Condition
@@ -762,17 +879,6 @@ export default function AssignmentsPage() {
                 ]}
                 value={assignCondition}
                 onChange={(e) => setAssignCondition(e.target.value)}
-              />
-            </div>
-            <div className="sm:col-span-2">
-              <label className="text-xs font-semibold text-slate-700 block mb-1">
-                Assignment Purpose / Remarks
-              </label>
-              <Textarea
-                rows={2}
-                placeholder="e.g. Standard developer workstation kit (Laptop, Monitor, Accessories)"
-                value={assignNotes}
-                onChange={(e) => setAssignNotes(e.target.value)}
               />
             </div>
           </div>
@@ -837,15 +943,9 @@ export default function AssignmentsPage() {
           )}
 
           <Select
-            label="Select Currently Assigned Asset"
+            label="Select Asset to Transfer"
             required
-            options={[
-              { value: '', label: '-- Choose Assigned Asset --' },
-              ...assignedAssets.map((a) => ({
-                value: a.id,
-                label: `${a.asset_number} (${a.model}) — Currently with: ${a.employee_name}`,
-              })),
-            ]}
+            options={transferAssetOptions}
             value={transferForm.asset_id}
             onChange={(e) => setTransferForm((prev) => ({ ...prev, asset_id: e.target.value }))}
           />
@@ -857,21 +957,13 @@ export default function AssignmentsPage() {
               { value: '', label: '-- Choose New Custodian --' },
               ...activeEmployees.map((e) => ({
                 value: e.id,
-                label: `${e.name} (${e.employee_id}) — ${e.department}`,
+                label: `${e.name} (${e.employee_id})`,
               })),
             ]}
             value={transferForm.to_employee_id}
             onChange={(e) =>
               setTransferForm((prev) => ({ ...prev, to_employee_id: e.target.value }))
             }
-          />
-
-          <Textarea
-            label="Reason for Transfer"
-            rows={2}
-            placeholder="e.g. Project reassignment or department rotation"
-            value={transferForm.notes}
-            onChange={(e) => setTransferForm((prev) => ({ ...prev, notes: e.target.value }))}
           />
 
           <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-2">
@@ -891,13 +983,13 @@ export default function AssignmentsPage() {
       <Modal
         isOpen={activeModal === 'return'}
         onClose={() => setActiveModal(null)}
-        title="Return Asset to Inventory"
-        description="Release equipment from employee custody back to central inventory stock."
+        title="Return Asset to IT Admin"
+        description="Release equipment from employee custody and return directly to IT Admin."
         size="md"
       >
         <form onSubmit={handleReturnSubmit} className="space-y-4">
           {modalError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
+            <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-lg text-xs text-rose-700 dark:text-rose-300">
               {modalError}
             </div>
           )}
@@ -905,31 +997,35 @@ export default function AssignmentsPage() {
           <Select
             label="Select Assigned Asset to Return"
             required
-            options={[
-              { value: '', label: '-- Choose Assigned Asset --' },
-              ...assignedAssets.map((a) => ({
-                value: a.id,
-                label: `${a.asset_number} (${a.model}) — From: ${a.employee_name}`,
-              })),
-            ]}
+            options={returnAssetOptions}
             value={returnForm.asset_id}
             onChange={(e) => setReturnForm((prev) => ({ ...prev, asset_id: e.target.value }))}
           />
 
-          <Textarea
-            label="Return Inspection Notes / Condition"
-            rows={2}
-            placeholder="e.g. Device returned in clean working condition, no physical damage"
+          <Select
+            label="Return Option"
+            required
+            options={[
+              { value: 'itadmin', label: 'Return to IT Admin' },
+            ]}
+            value={returnForm.return_to}
+            onChange={(e) => setReturnForm((prev) => ({ ...prev, return_to: e.target.value }))}
+            helperText="Custody is returned exclusively to IT Admin."
+          />
+
+          <Input
+            label="Return Notes / Remarks (Optional)"
+            placeholder="e.g. Returned to IT Admin in good working condition"
             value={returnForm.notes}
             onChange={(e) => setReturnForm((prev) => ({ ...prev, notes: e.target.value }))}
           />
 
-          <div className="pt-4 border-t border-slate-200 flex items-center justify-end gap-2">
+          <div className="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-end gap-2">
             <Button type="button" variant="outline" size="sm" onClick={() => setActiveModal(null)}>
               Cancel
             </Button>
             <Button type="submit" variant="danger" size="sm" isLoading={isSubmitting}>
-              Confirm Return to Stock
+              Confirm Return to IT Admin
             </Button>
           </div>
         </form>

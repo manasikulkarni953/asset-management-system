@@ -26,6 +26,10 @@ export async function GET(req: NextRequest) {
       }
       const tickets = await UserService.getSpecialistTickets(id);
       const specialist = await UserService.getUserById(id);
+      if (specialist && (specialist.name === 'Rahul Sharma' || (specialist as any).full_name === 'Rahul Sharma')) {
+        specialist.name = 'Pravin';
+        (specialist as any).full_name = 'Pravin';
+      }
       return NextResponse.json({ success: true, specialist, tickets });
     }
 

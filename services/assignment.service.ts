@@ -38,7 +38,7 @@ export class AssignmentService {
       `SELECT COUNT(*) as total 
        FROM asset_assignments aa
        JOIN assets a ON aa.asset_id = a.id
-       JOIN employees e ON aa.employee_id = e.id
+       JOIN employee e ON aa.employee_id = e.id
        WHERE ${whereClause}`,
       params
     );
@@ -52,10 +52,12 @@ export class AssignmentService {
         a.category as asset_category,
         a.brand as asset_brand,
         a.model as asset_model,
+        a.status as current_asset_status,
+        a.current_employee_id,
         aa.employee_id,
-        e.name as employee_name,
-        e.employee_id as employee_code,
-        e.department as employee_department,
+        COALESCE(e.name, e.full_name) as employee_name,
+        COALESCE(e.employee_id, CONCAT('TGS-', LPAD(e.id, 3, '0'))) as employee_code,
+        COALESCE(e.department, 'Operations') as employee_department,
         aa.assigned_date,
         aa.returned_date,
         aa.status,
@@ -65,7 +67,7 @@ export class AssignmentService {
         aa.created_at
        FROM asset_assignments aa
        JOIN assets a ON aa.asset_id = a.id
-       JOIN employees e ON aa.employee_id = e.id
+       JOIN employee e ON aa.employee_id = e.id
        LEFT JOIN users u ON aa.assigned_by_user_id = u.id
        WHERE ${whereClause}
        ORDER BY aa.id DESC
@@ -94,7 +96,7 @@ export class AssignmentService {
     return withTransaction(async (conn) => {
       // 1. Check employee with row locking
       const [empRows] = await conn.query<any[]>(
-        'SELECT id, name, employee_id, status FROM employees WHERE id = ? FOR UPDATE',
+        'SELECT id, COALESCE(name, full_name) as name, COALESCE(employee_id, CONCAT("TGS-", LPAD(id, 3, "0"))) as employee_id, status FROM employee WHERE id = ? FOR UPDATE',
         [employeeId]
       );
       if (empRows.length === 0) {
@@ -196,24 +198,33 @@ export class AssignmentService {
       if (assetRows.length === 0) throw new Error('Asset not found');
       const asset = assetRows[0];
 
-      if (!asset.current_employee_id) {
-        throw new Error(`Asset ${asset.asset_number} is not currently assigned. Use Assign instead.`);
-      }
-
-      if (asset.current_employee_id === data.to_employee_id) {
+      if (asset.current_employee_id && asset.current_employee_id === data.to_employee_id) {
         throw new Error('Cannot transfer asset to the same employee who currently has it.');
       }
 
       // 2. Fetch old employee name
-      const [oldEmpRows] = await conn.query<any[]>(
-        'SELECT id, name, employee_id FROM employees WHERE id = ?',
-        [asset.current_employee_id]
-      );
-      const oldEmpName = oldEmpRows[0]?.name || 'Previous Employee';
+      let oldEmpName = 'Central Stock';
+      if (asset.current_employee_id) {
+        const [oldEmpRows] = await conn.query<any[]>(
+          'SELECT id, COALESCE(name, full_name) as name, employee_id FROM employee WHERE id = ?',
+          [asset.current_employee_id]
+        );
+        oldEmpName = oldEmpRows[0]?.name || 'Previous Employee';
+      } else {
+        const [lastEmpRows] = await conn.query<any[]>(
+          `SELECT COALESCE(e.name, e.full_name) as name FROM asset_assignments aa
+           JOIN employee e ON aa.employee_id = e.id
+           WHERE aa.asset_id = ? ORDER BY aa.id DESC LIMIT 1`,
+          [data.asset_id]
+        );
+        if (lastEmpRows.length > 0) {
+          oldEmpName = `${lastEmpRows[0]?.name} (Stock)`;
+        }
+      }
 
       // 3. Fetch new employee name
       const [newEmpRows] = await conn.query<any[]>(
-        'SELECT id, name, employee_id, status FROM employees WHERE id = ?',
+        'SELECT id, COALESCE(name, full_name) as name, employee_id, status FROM employee WHERE id = ?',
         [data.to_employee_id]
       );
       if (newEmpRows.length === 0) throw new Error('Target employee not found');
@@ -266,22 +277,31 @@ export class AssignmentService {
     await withTransaction(async (conn) => {
       // 1. Check asset
       const [assetRows] = await conn.query<any[]>(
-        'SELECT id, asset_number, current_employee_id FROM assets WHERE id = ?',
+        'SELECT id, asset_number, current_employee_id, status FROM assets WHERE id = ?',
         [data.asset_id]
       );
       if (assetRows.length === 0) throw new Error('Asset not found');
       const asset = assetRows[0];
 
-      if (!asset.current_employee_id) {
-        throw new Error(`Asset ${asset.asset_number} is not currently assigned.`);
+      // 2. Fetch employee details (current or last assigned)
+      let empName = 'Employee';
+      if (asset.current_employee_id) {
+        const [empRows] = await conn.query<any[]>(
+          'SELECT id, COALESCE(name, full_name) as name, employee_id FROM employee WHERE id = ?',
+          [asset.current_employee_id]
+        );
+        empName = empRows[0]?.name || 'Employee';
+      } else {
+        const [lastEmpRows] = await conn.query<any[]>(
+          `SELECT COALESCE(e.name, e.full_name) as name FROM asset_assignments aa
+           JOIN employee e ON aa.employee_id = e.id
+           WHERE aa.asset_id = ? ORDER BY aa.id DESC LIMIT 1`,
+          [data.asset_id]
+        );
+        if (lastEmpRows.length > 0) {
+          empName = lastEmpRows[0]?.name || 'Employee';
+        }
       }
-
-      // 2. Fetch employee details
-      const [empRows] = await conn.query<any[]>(
-        'SELECT id, name, employee_id FROM employees WHERE id = ?',
-        [asset.current_employee_id]
-      );
-      const empName = empRows[0]?.name || 'Employee';
 
       // 3. Mark current assignment as returned
       const noteVal = data.notes || null;
@@ -289,8 +309,16 @@ export class AssignmentService {
         `UPDATE asset_assignments 
          SET status = 'returned', returned_date = CURRENT_TIMESTAMP, 
              notes = IF(? IS NOT NULL AND ? != '', CONCAT(IFNULL(notes, ''), ' [Return Note: ', ?, ']'), notes)
-         WHERE asset_id = ? AND status = 'assigned'`,
+         WHERE asset_id = ? AND (status = 'assigned' OR (status = 'transferred' AND returned_date IS NULL))`,
         [noteVal, noteVal, noteVal, data.asset_id] as any
+      );
+
+      // Close any open records for this asset
+      await conn.execute(
+        `UPDATE asset_assignments 
+         SET returned_date = COALESCE(returned_date, CURRENT_TIMESTAMP)
+         WHERE asset_id = ? AND returned_date IS NULL`,
+        [data.asset_id]
       );
 
       // 4. Update asset table
@@ -305,7 +333,7 @@ export class AssignmentService {
          VALUES (?, 'returned', ?, ?)`,
         [
           data.asset_id,
-          `Returned from ${empName} to inventory stock. ${data.notes ? `Note: ${data.notes}` : ''}`,
+          `Returned from ${empName} to IT Admin. ${data.notes ? `Note: ${data.notes}` : ''}`,
           userId || null,
         ]
       );
@@ -323,9 +351,9 @@ export class AssignmentService {
 
   static async getAssignedAssets(): Promise<Array<{ id: number; asset_number: string; model: string; employee_name: string; current_employee_id: number }>> {
     return query(
-      `SELECT a.id, a.asset_number, a.model, e.name as employee_name, a.current_employee_id 
+      `SELECT a.id, a.asset_number, a.model, COALESCE(e.name, e.full_name) as employee_name, a.current_employee_id 
        FROM assets a
-       JOIN employees e ON a.current_employee_id = e.id
+       JOIN employee e ON a.current_employee_id = e.id
        WHERE a.status = 'assigned'
        ORDER BY a.asset_number ASC`
     );

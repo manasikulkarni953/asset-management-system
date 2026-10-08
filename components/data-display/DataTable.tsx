@@ -39,9 +39,9 @@ export function DataTable<T extends Record<string, any>>({
 }: DataTableProps<T>) {
   if (isLoading) {
     return (
-      <div className="w-full bg-white rounded-xl border border-slate-200 p-12 flex flex-col items-center justify-center gap-3">
+      <div className="w-full bg-white dark:bg-[#0b1224] rounded-xl border border-slate-200 dark:border-slate-800 p-12 flex flex-col items-center justify-center gap-3">
         <Spinner size="lg" color="blue" />
-        <p className="text-sm font-medium text-slate-500">Loading data...</p>
+        <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Loading data...</p>
       </div>
     );
   }
@@ -52,7 +52,7 @@ export function DataTable<T extends Record<string, any>>({
         title={emptyTitle}
         description={emptyDescription}
         action={emptyAction}
-        className="bg-white border-slate-200"
+        className="bg-white dark:bg-[#0b1224] border-slate-200 dark:border-slate-800"
       />
     );
   }
@@ -66,13 +66,13 @@ export function DataTable<T extends Record<string, any>>({
   return (
     <div
       className={cn(
-        'w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs',
+        'w-full overflow-hidden rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b1224] shadow-xs',
         className
       )}
     >
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-left text-sm text-slate-700">
-          <thead className="border-b border-slate-200 bg-slate-50/90 text-xs font-semibold uppercase tracking-wider text-slate-700">
+        <table className="w-full border-collapse text-left text-sm text-slate-700 dark:text-slate-200">
+          <thead className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/90 dark:bg-[#0e172e]/90 text-xs font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300">
             <tr>
               {columns.map((col) => (
                 <th
@@ -89,7 +89,7 @@ export function DataTable<T extends Record<string, any>>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100 bg-white">
+          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 bg-white dark:bg-[#0b1224]">
             {data.map((row, idx) => {
               const rowKey = keyExtractor(row, idx);
               return (
@@ -98,15 +98,15 @@ export function DataTable<T extends Record<string, any>>({
                   onClick={() => onRowClick && onRowClick(row)}
                   className={cn(
                     'transition-colors duration-100',
-                    onRowClick ? 'cursor-pointer hover:bg-blue-50/30' : 'hover:bg-slate-50/80',
-                    idx % 2 === 1 && 'bg-slate-50/30'
+                    onRowClick ? 'cursor-pointer hover:bg-blue-50/30 dark:hover:bg-blue-950/20' : 'hover:bg-slate-50/80 dark:hover:bg-[#0e172e]/60',
+                    idx % 2 === 1 && 'bg-slate-50/30 dark:bg-[#090f20]/30'
                   )}
                 >
                   {columns.map((col) => (
                     <td
                       key={col.key}
                       className={cn(
-                        'px-4 py-3.5 text-slate-700 align-middle',
+                        'px-4 py-3.5 text-slate-700 dark:text-slate-200 align-middle',
                         alignStyles[col.align || 'left'],
                         col.className
                       )}

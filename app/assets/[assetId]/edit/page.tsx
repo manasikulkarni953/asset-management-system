@@ -33,7 +33,10 @@ export default function EditAssetPage({
     serial_number: '',
     purchase_date: '',
     purchase_cost: '',
+    location: '',
     vendor: '',
+    vendor_phone: '',
+    vendor_email: '',
     warranty_expiry: '',
     status: 'in_stock',
   });
@@ -52,7 +55,10 @@ export default function EditAssetPage({
             serial_number: a.serial_number,
             purchase_date: a.purchase_date ? a.purchase_date.split('T')[0] : '',
             purchase_cost: String(a.purchase_cost || ''),
-            vendor: a.vendor,
+            location: a.location || 'The Space',
+            vendor: a.vendor || '',
+            vendor_phone: a.vendor_phone || '',
+            vendor_email: a.vendor_email || '',
             warranty_expiry: a.warranty_expiry ? a.warranty_expiry.split('T')[0] : '',
             status: a.status,
           });
@@ -78,7 +84,10 @@ export default function EditAssetPage({
         serial_number: formData.serial_number,
         purchase_date: formData.purchase_date,
         purchase_cost: parseFloat(formData.purchase_cost) || 0,
-        vendor: formData.vendor,
+        location: formData.location ? formData.location.trim() : 'The Space',
+        vendor: formData.vendor.trim(),
+        vendor_phone: formData.vendor_phone ? formData.vendor_phone.trim() : null,
+        vendor_email: formData.vendor_email ? formData.vendor_email.trim() : null,
         status: formData.status,
       };
 
@@ -107,7 +116,7 @@ export default function EditAssetPage({
 
   const handleRetire = async () => {
     try {
-      const res = await fetch(`/api/assets/${assetId}`, {
+      const res = await fetch(`/api/assets/${assetId}?mode=retire`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: 'Asset retired via asset edit panel' }),
@@ -226,8 +235,8 @@ export default function EditAssetPage({
             </FormSection>
 
             <FormSection
-              title="Procurement & Financials"
-              description="Purchase details and warranty dates."
+              title="Procurement, Warranty & Location"
+              description="Purchase details, warranty dates, and hardware location."
               borderTop
             >
               <DateInput
@@ -247,17 +256,47 @@ export default function EditAssetPage({
                 onChange={(e) => handleChange('purchase_cost', e.target.value)}
               />
 
-              <Input
-                label="Vendor / Supplier"
-                required
-                value={formData.vendor}
-                onChange={(e) => handleChange('vendor', e.target.value)}
-              />
-
               <DateInput
                 label="Warranty Expiry Date"
                 value={formData.warranty_expiry}
                 onChange={(e) => handleChange('warranty_expiry', e.target.value)}
+              />
+
+              <Input
+                label="Location"
+                placeholder="e.g. The Space, 5th Floor, Server Room"
+                value={formData.location}
+                onChange={(e) => handleChange('location', e.target.value)}
+              />
+            </FormSection>
+
+            <FormSection
+              title="Vendor Details"
+              description="Supplier contact details including name, phone number, and email ID."
+              borderTop
+            >
+              <Input
+                label="Vendor Name"
+                required
+                placeholder="e.g. CDW, Insight, Dell Direct, Apple"
+                value={formData.vendor}
+                onChange={(e) => handleChange('vendor', e.target.value)}
+              />
+
+              <Input
+                label="Phone No"
+                type="tel"
+                placeholder="e.g. +1 (800) 555-0199"
+                value={formData.vendor_phone}
+                onChange={(e) => handleChange('vendor_phone', e.target.value)}
+              />
+
+              <Input
+                label="Email ID"
+                type="email"
+                placeholder="e.g. support@vendor.com"
+                value={formData.vendor_email}
+                onChange={(e) => handleChange('vendor_email', e.target.value)}
               />
             </FormSection>
           </div>

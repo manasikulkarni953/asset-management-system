@@ -72,7 +72,7 @@ export function BarcodeGenerator({
 
   if (!value) {
     return (
-      <div className="flex items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded text-xs text-slate-400">
+      <div className="flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-xs text-slate-400 dark:text-slate-500">
         No Asset Number
       </div>
     );

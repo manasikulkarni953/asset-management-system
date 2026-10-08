@@ -128,14 +128,14 @@ export class ScanService {
             aa.assigned_date,
             aa.employee_id,
             e.id AS employee_pk_id,
-            e.employee_id AS employee_code,
-            e.name AS employee_name,
+            COALESCE(e.employee_id, CONCAT('TGS-', LPAD(e.id, 3, '0'))) AS employee_code,
+            COALESCE(e.name, e.full_name) AS employee_name,
             e.email AS employee_email,
-            e.department,
-            e.designation,
-            e.location
+            COALESCE(e.department, 'Operations') as department,
+            COALESCE(e.designation, e.job_title, 'Staff') as designation,
+            COALESCE(e.location, 'The Space') as location
            FROM asset_assignments aa
-           JOIN employees e ON aa.employee_id = e.id
+           JOIN employee e ON aa.employee_id = e.id
            WHERE aa.asset_id = ? 
              AND aa.status = 'assigned' 
              AND aa.returned_date IS NULL

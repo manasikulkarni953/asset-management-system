@@ -10,29 +10,46 @@ export async function GET(req: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized: Authentication required.' }, { status: 401 });
     }
-    if (!Permissions.canManageNetwork(user)) {
-      return NextResponse.json({ error: 'Forbidden: Insufficient privileges' }, { status: 403 });
+
+    let employeeId: number | undefined = undefined;
+
+    // Role-based data isolation: employees only receive network data for their assigned equipment
+    if (user.role === 'employee') {
+      const { EmployeeService } = await import('@/services/employee.service');
+      const ownEmp = await EmployeeService.getEmployeeByUser(user);
+      if (!ownEmp) {
+        return NextResponse.json({
+          success: true,
+          networkList: [],
+          total: 0,
+          stats: { totalConfigured: 0, staticIp: 0, dhcp: 0, totalVlans: 0 },
+          vlans: [],
+          page: 1,
+          limit: 20,
+        });
+      }
+      employeeId = ownEmp.id;
     }
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search') || undefined;
+    const assignment_type = searchParams.get('assignment_type') || undefined;
     const vlan = searchParams.get('vlan') || undefined;
     const page = Math.max(1, Number(searchParams.get('page')) || 1);
     const limit = Math.min(100, Math.max(1, Number(searchParams.get('limit')) || 20));
 
     const data = await NetworkService.getNetworkList({
       search,
+      assignment_type,
       vlan,
       page,
       limit,
+      employeeId,
     });
-
-    const vlans = await NetworkService.getVlans();
 
     return NextResponse.json({
       success: true,
       ...data,
-      vlans,
       page,
       limit,
     });
@@ -59,18 +76,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON request payload' }, { status: 400 });
     }
 
-    const assetId = Number(body.asset_id);
-    if (!assetId || isNaN(assetId)) {
-      return NextResponse.json({ error: 'Valid asset_id is required' }, { status: 400 });
-    }
-
     const validated = networkSchema.parse(body);
-    const network = await NetworkService.upsertNetwork(assetId, validated);
+    const network = await NetworkService.upsertNetwork(validated.asset_id, validated);
 
     return NextResponse.json({
       success: true,
       network,
-      message: 'Network configuration updated successfully',
+      message: 'Network configuration saved successfully',
     });
   } catch (error: any) {
     if (error?.name === 'ZodError') {

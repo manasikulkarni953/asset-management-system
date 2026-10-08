@@ -36,13 +36,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       secondary:
         'bg-slate-800 text-white hover:bg-slate-900 active:bg-black focus:ring-slate-700 shadow-sm',
       outline:
-        'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 active:bg-slate-100 focus:ring-blue-500 shadow-xs',
+        'border border-slate-300 dark:border-slate-700 bg-white dark:bg-[#0c1428] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#121c38] active:bg-slate-100 dark:active:bg-[#162244] focus:ring-blue-500 shadow-xs',
       danger:
         'bg-rose-600 text-white hover:bg-rose-700 active:bg-rose-800 focus:ring-rose-500 shadow-sm shadow-rose-500/20',
       success:
         'bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800 focus:ring-emerald-500 shadow-sm shadow-emerald-500/20',
       ghost:
-        'bg-transparent text-slate-600 hover:bg-slate-100 active:bg-slate-200 focus:ring-slate-400',
+        'bg-transparent text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 active:bg-slate-200 dark:active:bg-slate-700 focus:ring-slate-400',
     };
 
     const sizes = {

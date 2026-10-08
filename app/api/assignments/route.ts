@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
       await AssignmentService.returnAsset(validated, user.id);
       return NextResponse.json({
         success: true,
-        message: 'Asset returned to inventory successfully',
+        message: 'Asset returned to IT Admin successfully',
       });
     }
 

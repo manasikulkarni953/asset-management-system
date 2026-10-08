@@ -1,6 +1,11 @@
 import { query, execute } from '@/lib/db';
 import { hashPassword } from '@/lib/auth';
 import { UserRole } from '@/lib/permissions';
+import {
+  getNextEmployeeId,
+  normalizeEmployeeId,
+  getNextAvailableWorkstation,
+} from '@/lib/employee-id';
 
 export interface UserRecord {
   id: number;
@@ -90,6 +95,16 @@ export class UserService {
     const passwordHash = await hashPassword(data.password);
     const name = data.name.trim();
 
+    // 1. Resolve employee_id if role is employee
+    let resolvedEmployeeId = data.employee_id?.trim() || null;
+    if (data.role === 'employee') {
+      if (resolvedEmployeeId) {
+        resolvedEmployeeId = normalizeEmployeeId(resolvedEmployeeId);
+      } else {
+        resolvedEmployeeId = await getNextEmployeeId();
+      }
+    }
+
     const { insertId } = await execute(
       `INSERT INTO users (username, email, password_hash, full_name, name, role, designation, employee_id, status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')`,
@@ -101,9 +116,59 @@ export class UserService {
         name,
         data.role,
         data.designation?.trim() || null,
-        data.employee_id?.trim() || null,
+        resolvedEmployeeId,
       ]
     );
+
+    // 2. Synchronize to `employee` table if user role is employee
+    if (data.role === 'employee') {
+      try {
+        const workstation = await getNextAvailableWorkstation();
+        const designation = data.designation?.trim() || 'Staff';
+
+        const existingEmp = await query<any>(
+          'SELECT id FROM employee WHERE email = ? OR (employee_id IS NOT NULL AND employee_id = ?) LIMIT 1',
+          [email, resolvedEmployeeId]
+        );
+
+        if (existingEmp.length > 0) {
+          await execute(
+            `UPDATE employee SET
+               name = ?,
+               full_name = ?,
+               email = ?,
+               employee_id = COALESCE(employee_id, ?),
+               designation = ?,
+               job_title = ?,
+               status = 'active',
+               is_active = 1
+             WHERE id = ?`,
+            [name, name, email, resolvedEmployeeId, designation, designation, existingEmp[0].id]
+          );
+        } else {
+          await execute(
+            `INSERT INTO employee (
+               employee_id, name, full_name, username, email, password,
+               department, designation, job_title, location, workstation,
+               role, status, is_active
+             ) VALUES (?, ?, ?, ?, ?, ?, 'General', ?, ?, 'The Space', ?, 'agent', 'active', 1)`,
+            [
+              resolvedEmployeeId,
+              name,
+              name,
+              username,
+              email,
+              passwordHash,
+              designation,
+              designation,
+              workstation,
+            ]
+          );
+        }
+      } catch (empSyncErr: any) {
+        console.error('[USER_SERVICE] Error syncing new employee to employee table:', empSyncErr?.message);
+      }
+    }
 
     const created = await this.getUserById(insertId);
     return created!;
@@ -171,11 +236,50 @@ export class UserService {
       await execute(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, [...params, id]);
     }
 
+    // Synchronize updates to employee table if role is employee or has employee_id
+    if (data.role === 'employee' || existing.role === 'employee' || existing.employee_id) {
+      try {
+        const empEmail = data.email ? data.email.trim().toLowerCase() : existing.email;
+        const empIdCode = data.employee_id !== undefined ? (data.employee_id ? data.employee_id.trim() : null) : existing.employee_id;
+        const empName = data.name ? data.name.trim() : existing.name;
+        const empDesig = data.designation !== undefined ? (data.designation?.trim() || 'Staff') : (existing.designation || 'Staff');
+        const empStatus = (data.status || existing.status) === 'active' ? 'active' : 'terminated';
+        const isActive = empStatus === 'active' ? 1 : 0;
+
+        await execute(
+          `UPDATE employee SET
+             name = COALESCE(?, name),
+             full_name = COALESCE(?, full_name),
+             email = COALESCE(?, email),
+             employee_id = COALESCE(?, employee_id),
+             designation = ?,
+             job_title = ?,
+             status = ?,
+             is_active = ?
+           WHERE email = ? OR (employee_id IS NOT NULL AND employee_id = ?)`,
+          [
+            empName,
+            empName,
+            empEmail,
+            empIdCode,
+            empDesig,
+            empDesig,
+            empStatus,
+            isActive,
+            existing.email,
+            existing.employee_id
+          ]
+        );
+      } catch (empUpdateErr: any) {
+        console.error('[USER_SERVICE] Error syncing employee update to employee table:', empUpdateErr?.message);
+      }
+    }
+
     const updated = await this.getUserById(id);
     return updated!;
   }
 
-  // Factual Operational Statistics for IT Specialists (role = admin, designation = IT Specialist)
+  // Factual Operational Statistics for IT Specialists / IT Admins (role = admin, designation = IT Specialist)
   static async getITSpecialistWorkload(): Promise<ITSpecialistWorkload[]> {
     const sql = `
       SELECT 
@@ -193,11 +297,15 @@ export class UserService {
         SUM(CASE WHEN t.status = 'closed' THEN 1 ELSE 0 END) as closed_tickets
       FROM users u
       LEFT JOIN tickets t ON (t.assigned_to = u.id OR t.assigned_to_user_id = u.id)
-      WHERE u.role = 'admin' AND u.status = 'active'
+      WHERE u.role = 'admin' AND u.status = 'active' AND u.email != 'admin@example.com'
       GROUP BY u.id, u.name, u.full_name, u.email, u.designation, u.role, u.status
       ORDER BY total_assigned DESC, u.id ASC
     `;
-    return query<ITSpecialistWorkload>(sql);
+    const rows = await query<ITSpecialistWorkload>(sql);
+    return rows.map((r) => ({
+      ...r,
+      name: r.name === 'Rahul Sharma' ? 'Pravin' : r.name,
+    }));
   }
 
   // Drilldown into tickets assigned to a specific specialist
@@ -221,14 +329,33 @@ export class UserService {
         a.asset_id as asset_system_id,
         a.model as asset_model,
         a.category as asset_category,
-        e.name as employee_name,
-        e.employee_id as employee_code
+        COALESCE(e.name, e.full_name) as employee_name,
+        COALESCE(e.employee_id, CONCAT('TGS-', LPAD(e.id, 3, '0'))) as employee_code
       FROM tickets t
       LEFT JOIN assets a ON t.asset_id = a.id
-      LEFT JOIN employees e ON t.employee_id = e.id
+      LEFT JOIN employee e ON t.employee_id = e.id
       WHERE t.assigned_to = ? OR t.assigned_to_user_id = ?
       ORDER BY t.created_at DESC
     `;
     return query<any>(sql, [specialistId, specialistId]);
+  }
+
+  // Delete user from system
+  static async deleteUser(id: number): Promise<boolean> {
+    const user = await this.getUserById(id);
+    if (!user) {
+      throw new Error(`User with ID ${id} not found`);
+    }
+
+    // Remove any targeted notifications for this user
+    try {
+      await execute('DELETE FROM notifications WHERE user_id = ?', [id]);
+    } catch (e) {
+      console.error('[UserService] Notice removing user notifications:', e);
+    }
+
+    // Delete user record
+    const result = await execute('DELETE FROM users WHERE id = ?', [id]);
+    return result.affectedRows > 0;
   }
 }

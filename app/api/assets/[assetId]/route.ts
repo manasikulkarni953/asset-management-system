@@ -108,16 +108,26 @@ export async function DELETE(
       return NextResponse.json({ error: 'Invalid asset ID' }, { status: 400 });
     }
 
-    const body = await req.json().catch(() => ({}));
-    const reason = body?.reason || 'Asset retired by administrator';
+    const { searchParams } = new URL(req.url);
+    const mode = searchParams.get('mode');
 
-    await AssetService.retireAsset(id, reason, user.id);
+    if (mode === 'retire') {
+      const body = await req.json().catch(() => ({}));
+      const reason = body?.reason || 'Asset retired by administrator';
+      await AssetService.retireAsset(id, reason, user.id);
+      return NextResponse.json({
+        success: true,
+        message: 'Asset marked as retired successfully',
+      });
+    }
+
+    await AssetService.deleteAsset(id);
 
     return NextResponse.json({
       success: true,
-      message: 'Asset marked as retired successfully',
+      message: 'Asset deleted successfully',
     });
   } catch (error: any) {
-    return NextResponse.json({ error: error?.message || 'Failed to retire asset' }, { status: 400 });
+    return NextResponse.json({ error: error?.message || 'Failed to delete asset' }, { status: 400 });
   }
 }

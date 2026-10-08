@@ -301,52 +301,52 @@ export default function ScanPage() {
               </div>
 
               {/* Right Column: Employee Custodian & Group Summary */}
-              <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3 flex flex-col justify-between">
+              <div className="bg-white dark:bg-[#0b1224] p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-3 flex flex-col justify-between">
                 <div>
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                      <UserCheck className="w-4 h-4 text-emerald-600" /> Current Employee
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                      <UserCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" /> Current Employee
                     </span>
-                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60">
                       {scanResult.data.employee.employeeId}
                     </span>
                   </div>
 
                   <div className="pt-2">
-                    <h4 className="text-base font-bold text-slate-900">
+                    <h4 className="text-base font-bold text-slate-900 dark:text-white">
                       {scanResult.data.employee.name}
                     </h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                       {scanResult.data.employee.designation} • {scanResult.data.employee.department}
                     </p>
                   </div>
 
-                  <div className="mt-4 p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl flex items-center justify-between">
+                  <div className="mt-4 p-3 bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/60 rounded-xl flex items-center justify-between">
                     <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-900 block">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-900 dark:text-indigo-200 block">
                         Total Current Assigned Assets
                       </span>
-                      <span className="text-xs text-indigo-700">
+                      <span className="text-xs text-indigo-700 dark:text-indigo-300">
                         Active hardware units in custodian&apos;s possession
                       </span>
                     </div>
                     <div className="text-right">
-                      <span className="text-2xl font-extrabold font-mono text-indigo-900">
+                      <span className="text-2xl font-extrabold font-mono text-indigo-900 dark:text-indigo-200">
                         {scanResult.data.assetCount}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                  <span className="text-[11px] text-slate-500 truncate max-w-[200px]">
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                  <span className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[200px]">
                     {scanResult.data.employee.email}
                   </span>
                   <Link href={`/employees/${scanResult.data.employee.id}`}>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-xs text-indigo-600 hover:bg-indigo-50"
+                      className="text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
                       icon={<ArrowRight className="w-3.5 h-3.5" />}
                     >
                       Employee Profile
@@ -379,7 +379,7 @@ export default function ScanPage() {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500" />
                 </span>
-                <span className="font-bold text-slate-900 tracking-wide text-base">
+                <span className="font-bold text-slate-900 dark:text-white tracking-wide text-base">
                   ASSET FOUND
                 </span>
               </div>

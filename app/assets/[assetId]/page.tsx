@@ -24,7 +24,7 @@ export default function AssetDetailsPage({
   const [isLoading, setIsLoading] = useState(true);
   const [isPrintOpen, setIsPrintOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'assignments' | 'tickets' | 'history' | 'insurance_network'
+    'overview' | 'assignments' | 'tickets' | 'history' | 'insurance' | 'network'
   >('overview');
 
   useEffect(() => {
@@ -41,7 +41,7 @@ export default function AssetDetailsPage({
     return (
       <div className="py-20 flex flex-col items-center justify-center gap-3">
         <Spinner size="lg" />
-        <p className="text-sm text-slate-500">Loading asset details...</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">Loading asset details...</p>
       </div>
     );
   }
@@ -49,8 +49,8 @@ export default function AssetDetailsPage({
   if (!asset) {
     return (
       <div className="py-20 text-center">
-        <h2 className="text-xl font-bold text-slate-800">Asset Not Found</h2>
-        <p className="text-sm text-slate-500 mt-1">The requested asset record does not exist.</p>
+        <h2 className="text-xl font-bold text-slate-800 dark:text-white">Asset Not Found</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">The requested asset record does not exist.</p>
         <Link href="/assets" className="mt-4 inline-block">
           <Button variant="primary" size="sm">Back to Assets</Button>
         </Link>
@@ -87,7 +87,7 @@ export default function AssetDetailsPage({
               size="sm"
               onClick={() => setIsPrintOpen(true)}
               icon={
-                <svg className="w-4 h-4 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-slate-600 dark:text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                 </svg>
               }
@@ -98,7 +98,7 @@ export default function AssetDetailsPage({
               <Button
                 variant="outline"
                 size="sm"
-                className="border-rose-200 text-rose-700 hover:bg-rose-50"
+                className="border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40"
               >
                 Raise Ticket
               </Button>
@@ -113,13 +113,14 @@ export default function AssetDetailsPage({
       />
 
       {/* Tabs navigation */}
-      <div className="flex items-center gap-1 border-b border-slate-200 overflow-x-auto pb-px">
+      <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800 overflow-x-auto pb-px">
         {[
           { key: 'overview', label: 'Overview' },
           { key: 'assignments', label: 'Custody & Assignment', count: asset.assignments?.length },
           { key: 'tickets', label: 'Support Tickets', count: asset.tickets?.length },
           { key: 'history', label: 'Audit History', count: asset.history?.length },
-          { key: 'insurance_network', label: 'Insurance & Network' },
+          { key: 'insurance', label: 'Insurance' },
+          { key: 'network', label: 'Network' },
         ].map((tab) => {
           const isActive = activeTab === tab.key;
           return (
@@ -127,17 +128,19 @@ export default function AssetDetailsPage({
               key={tab.key}
               type="button"
               onClick={() => setActiveTab(tab.key as any)}
-              className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 whitespace-nowrap flex items-center gap-2 ${
+              className={`px-4 py-2.5 text-xs font-semibold rounded-t-lg transition-colors border-b-2 whitespace-nowrap flex items-center gap-2 cursor-pointer ${
                 isActive
-                  ? 'border-blue-600 text-blue-600 bg-blue-50/50'
-                  : 'border-transparent text-slate-500 hover:text-slate-900 hover:bg-slate-50'
+                  ? 'border-blue-600 dark:border-blue-400 text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/40'
+                  : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60'
               }`}
             >
               <span>{tab.label}</span>
               {typeof tab.count === 'number' && (
                 <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                    isActive ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-600'
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                    isActive
+                      ? 'bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                   }`}
                 >
                   {tab.count}
@@ -179,47 +182,94 @@ export default function AssetDetailsPage({
 
             {/* Center & Right: Specs & Custody */}
             <div className="lg:col-span-2 space-y-6">
-              <Card title="Hardware & Procurement Information">
+              {/* Card 1: Hardware Specifications */}
+              <Card title="Hardware Specifications" subtitle="Device classification, model and system identities">
                 <dl className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 text-xs">
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <dt className="text-slate-400 uppercase font-semibold text-[10px]">System Asset ID</dt>
-                    <dd className="font-mono font-bold text-blue-600 text-sm mt-0.5">{asset.asset_id || '-'}</dd>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">Asset Number</dt>
+                    <dd className="font-mono font-bold text-slate-900 dark:text-white text-sm mt-0.5">{asset.asset_number || '-'}</dd>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <dt className="text-slate-400 uppercase font-semibold text-[10px]">Category</dt>
-                    <dd className="font-bold text-slate-800 text-sm mt-0.5">{asset.category}</dd>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">System Asset ID</dt>
+                    <dd className="font-mono font-bold text-blue-600 dark:text-blue-400 text-sm mt-0.5">{asset.asset_id || '-'}</dd>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <dt className="text-slate-400 uppercase font-semibold text-[10px]">Brand / Manufacturer</dt>
-                    <dd className="font-bold text-slate-800 text-sm mt-0.5">{asset.brand}</dd>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">Category</dt>
+                    <dd className="font-bold text-slate-800 dark:text-slate-200 text-sm mt-0.5">{asset.category}</dd>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <dt className="text-slate-400 uppercase font-semibold text-[10px]">Model</dt>
-                    <dd className="font-bold text-slate-800 text-sm mt-0.5">{asset.model}</dd>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">Brand / Manufacturer</dt>
+                    <dd className="font-bold text-slate-800 dark:text-slate-200 text-sm mt-0.5">{asset.brand}</dd>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <dt className="text-slate-400 uppercase font-semibold text-[10px]">Hardware Serial Number</dt>
-                    <dd className="font-mono font-bold text-slate-800 text-sm mt-0.5">{asset.serial_number}</dd>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">Model</dt>
+                    <dd className="font-bold text-slate-800 dark:text-slate-200 text-sm mt-0.5">{asset.model}</dd>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <dt className="text-slate-400 uppercase font-semibold text-[10px]">Purchase Date</dt>
-                    <dd className="font-semibold text-slate-800 mt-0.5">{formatDate(asset.purchase_date)}</dd>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">Hardware Serial Number</dt>
+                    <dd className="font-mono font-bold text-slate-900 dark:text-white text-sm mt-0.5">{asset.serial_number}</dd>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <dt className="text-slate-400 uppercase font-semibold text-[10px]">Purchase Cost</dt>
-                    <dd className="font-mono font-semibold text-slate-800 mt-0.5">{formatCurrency(asset.purchase_cost)}</dd>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">Physical Location</dt>
+                    <dd className="font-semibold text-slate-800 dark:text-slate-200 text-sm mt-0.5">{asset.location || 'The Space'}</dd>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <dt className="text-slate-400 uppercase font-semibold text-[10px]">Vendor</dt>
-                    <dd className="font-semibold text-slate-800 mt-0.5">{asset.vendor}</dd>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">Registered On</dt>
+                    <dd className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">{formatDate(asset.created_at)}</dd>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <dt className="text-slate-400 uppercase font-semibold text-[10px]">Warranty Expiry</dt>
-                    <dd className="font-semibold text-slate-800 mt-0.5">{formatDate(asset.warranty_expiry)}</dd>
+                </dl>
+              </Card>
+
+              {/* Card 2: Procurement & Warranty */}
+              <Card title="Procurement & Financials" subtitle="Acquisition cost, purchase date, and warranty coverage">
+                <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">Purchase Date</dt>
+                    <dd className="font-semibold text-slate-800 dark:text-slate-200 text-sm mt-0.5">{formatDate(asset.purchase_date)}</dd>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <dt className="text-slate-400 uppercase font-semibold text-[10px]">Registered On</dt>
-                    <dd className="font-semibold text-slate-800 mt-0.5">{formatDate(asset.created_at)}</dd>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">Purchase Cost</dt>
+                    <dd className="font-mono font-semibold text-slate-800 dark:text-slate-200 text-sm mt-0.5">{formatCurrency(asset.purchase_cost)}</dd>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">Warranty Expiry</dt>
+                    <dd className="font-semibold text-slate-800 dark:text-slate-200 text-sm mt-0.5">
+                      {asset.warranty_expiry ? formatDate(asset.warranty_expiry) : <span className="text-slate-400">None / Not Specified</span>}
+                    </dd>
+                  </div>
+                </dl>
+              </Card>
+
+              {/* Card 3: Vendor Details */}
+              <Card title="Vendor Details" subtitle="Supplier and procurement contact information">
+                <dl className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">Vendor Name</dt>
+                    <dd className="font-bold text-slate-800 dark:text-slate-200 text-sm mt-0.5">{asset.vendor || '-'}</dd>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">Phone No</dt>
+                    <dd className="font-semibold text-slate-800 dark:text-slate-200 text-sm mt-0.5">
+                      {asset.vendor_phone ? (
+                        <a href={`tel:${asset.vendor_phone}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                          {asset.vendor_phone}
+                        </a>
+                      ) : (
+                        <span className="text-slate-400">Not Provided</span>
+                      )}
+                    </dd>
+                  </div>
+                  <div className="p-3 bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-lg">
+                    <dt className="text-slate-400 dark:text-slate-400 uppercase font-semibold text-[10px]">Email ID</dt>
+                    <dd className="font-semibold text-slate-800 dark:text-slate-200 text-sm mt-0.5">
+                      {asset.vendor_email ? (
+                        <a href={`mailto:${asset.vendor_email}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                          {asset.vendor_email}
+                        </a>
+                      ) : (
+                        <span className="text-slate-400">Not Provided</span>
+                      )}
+                    </dd>
                   </div>
                 </dl>
               </Card>
@@ -401,85 +451,138 @@ export default function AssetDetailsPage({
         </Card>
       )}
 
-      {/* Tab: Insurance & Network */}
-      {activeTab === 'insurance_network' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Insurance */}
-          <Card
-            title="Insurance Policy"
-            headerAction={
-              <Link href="/insurance" className="text-xs text-blue-600 hover:underline">
-                Manage Insurance →
+      {/* Tab: Insurance */}
+      {activeTab === 'insurance' && (
+        <Card
+          title="Insurance Policy"
+          subtitle={`Policy details for ${asset.asset_number}`}
+          headerAction={
+            <Link href="/insurance" className="text-xs text-blue-600 hover:underline">
+              Manage Insurance →
+            </Link>
+          }
+        >
+          {asset.insurance ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <span className="text-slate-500 block">Insurance Provider</span>
+                  <span className="font-semibold text-slate-800 text-sm mt-0.5 block">{asset.insurance.provider}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Policy Number</span>
+                  <span className="font-mono font-semibold text-slate-800 text-sm mt-0.5 block">{asset.insurance.policy_number}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Coverage Amount</span>
+                  <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{formatCurrency(asset.insurance.coverage_amount)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Start Date</span>
+                  <span className="font-medium text-slate-700 mt-0.5 block">{formatDate(asset.insurance.start_date)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Expiry Date</span>
+                  <span className="font-medium text-slate-700 mt-0.5 block">{formatDate(asset.insurance.expiry_date)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Status</span>
+                  <div className="mt-1">
+                    <StatusBadge status={asset.insurance.status} size="sm" />
+                  </div>
+                </div>
+              </div>
+              {asset.insurance.notes && (
+                <div className="pt-3 border-t border-slate-100 text-xs">
+                  <span className="text-slate-500 font-semibold block mb-1">Notes:</span>
+                  <p className="text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap">
+                    {asset.insurance.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-xs text-slate-400">
+              <p>No insurance policy mapped to this asset.</p>
+              <Link href="/insurance" className="inline-block mt-2 text-blue-600 hover:underline font-medium">
+                + Add Insurance Policy
               </Link>
-            }
-          >
-            {asset.insurance ? (
-              <div className="space-y-3 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Provider</span>
-                  <span className="font-semibold text-slate-800">{asset.insurance.provider}</span>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Tab: Network */}
+      {activeTab === 'network' && (
+        <Card
+          title="Network Configuration"
+          subtitle={`Network interface details for ${asset.asset_number}`}
+          headerAction={
+            <Link href="/network" className="text-xs text-blue-600 hover:underline">
+              Manage Network →
+            </Link>
+          }
+        >
+          {asset.network ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+                <div>
+                  <span className="text-slate-500 block">IP Address</span>
+                  <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{asset.network.ip_address || '-'}</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Policy Number</span>
-                  <span className="font-mono font-semibold text-slate-800">{asset.insurance.policy_number}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Coverage Period</span>
-                  <span className="font-medium text-slate-700">
-                    {formatDate(asset.insurance.start_date)} to {formatDate(asset.insurance.expiry_date)}
+                <div>
+                  <span className="text-slate-500 block">IP Assignment</span>
+                  <span className="font-semibold text-slate-800 mt-0.5 block">
+                    {asset.network.assignment_type || 'Static'}
                   </span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Coverage Amount</span>
-                  <span className="font-mono font-bold text-slate-900">{formatCurrency(asset.insurance.coverage_amount)}</span>
+                <div>
+                  <span className="text-slate-500 block">MAC Address</span>
+                  <span className="font-mono font-semibold text-slate-800 text-sm mt-0.5 block">{asset.network.mac_address || '-'}</span>
                 </div>
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                  <span className="text-slate-500">Status</span>
-                  <StatusBadge status={asset.insurance.status} size="sm" />
+                <div>
+                  <span className="text-slate-500 block">Hostname</span>
+                  <span className="font-mono text-slate-700 mt-0.5 block">{asset.network.hostname || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Network Name</span>
+                  <span className="font-medium text-slate-700 mt-0.5 block">{asset.network.network_name || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">VLAN</span>
+                  <span className="font-bold text-blue-600 font-mono mt-0.5 block">{asset.network.vlan || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Subnet Mask</span>
+                  <span className="font-mono text-slate-700 mt-0.5 block">{asset.network.subnet_mask || '255.255.255.0'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Default Gateway</span>
+                  <span className="font-mono text-slate-700 mt-0.5 block">{asset.network.gateway || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">DNS Server</span>
+                  <span className="font-mono text-slate-700 mt-0.5 block">{asset.network.dns_server || '-'}</span>
                 </div>
               </div>
-            ) : (
-              <p className="text-xs text-slate-400 py-3 text-center">No active insurance policy mapped to this asset.</p>
-            )}
-          </Card>
-
-          {/* Network */}
-          <Card
-            title="Network Configuration"
-            headerAction={
-              <Link href="/network" className="text-xs text-blue-600 hover:underline">
-                Manage Network →
+              {asset.network.notes && (
+                <div className="pt-3 border-t border-slate-100 text-xs">
+                  <span className="text-slate-500 font-semibold block mb-1">Notes:</span>
+                  <p className="text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap">
+                    {asset.network.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="py-8 text-center text-xs text-slate-400">
+              <p>No network interface configured for this asset.</p>
+              <Link href="/network" className="inline-block mt-2 text-blue-600 hover:underline font-medium">
+                + Configure Network Interface
               </Link>
-            }
-          >
-            {asset.network ? (
-              <div className="space-y-3 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">IP Address</span>
-                  <span className="font-mono font-semibold text-slate-800">{asset.network.ip_address || '-'}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">MAC Address</span>
-                  <span className="font-mono font-semibold text-slate-800">{asset.network.mac_address || '-'}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Hostname</span>
-                  <span className="font-mono text-slate-700">{asset.network.hostname || '-'}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Network Name</span>
-                  <span className="font-medium text-slate-700">{asset.network.network_name || '-'}</span>
-                </div>
-                <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                  <span className="text-slate-500">VLAN</span>
-                  <span className="font-bold text-blue-600">{asset.network.vlan || '-'}</span>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-400 py-3 text-center">No network interface configured for this asset.</p>
-            )}
-          </Card>
-        </div>
+            </div>
+          )}
+        </Card>
       )}
 
       {/* Print modal */}

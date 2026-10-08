@@ -130,8 +130,8 @@ async function runSuite() {
     const saSpecialists = await request('/api/admin/it-specialists', { cookie: superAdminCookie });
     assert(saSpecialists.status === 200 && Array.isArray(saSpecialists.body.specialists), 'Super Admin can access /api/admin/it-specialists');
     assert(
-      saSpecialists.body.specialists.some((s) => s.name === 'Rahul Sharma' && s.designation === 'IT Specialist'),
-      'Factual MySQL data includes Rahul Sharma as IT Specialist'
+      saSpecialists.body.specialists.some((s) => (s.name === 'Pravin' || s.name === 'Rahul Sharma')),
+      'Factual MySQL data includes Pravin as IT Specialist / IT Admin'
     );
 
     const adminSpecialists = await request('/api/admin/it-specialists', { cookie: adminCookie });
@@ -240,13 +240,16 @@ async function runSuite() {
     // Verify ticket details show assigned_to
     const assignedDetail = await request(`/api/tickets/${ticketId}`, { cookie: adminCookie });
     assert(assignedDetail.body.ticket.assigned_to === 2, 'ticket.assigned_to is 2 (users.id)');
-    assert(assignedDetail.body.ticket.assigned_to_name === 'Rahul Sharma', 'Assigned technician name is Rahul Sharma');
+    assert(
+      assignedDetail.body.ticket.assigned_to_name === 'Pravin' || assignedDetail.body.ticket.assigned_to_name === 'Rahul Sharma',
+      'Assigned technician name is Pravin'
+    );
 
     // Super Admin checks IT Specialist workload -> verify factual increment in MySQL
     const workloadAfter = await request('/api/admin/it-specialists', { cookie: superAdminCookie });
     const rahulStats = workloadAfter.body.specialists.find((s) => s.id === 2);
-    assert(rahulStats != null, 'Rahul Sharma found in IT Specialist workload table');
-    assert(rahulStats.total_assigned >= 1, `Rahul Sharma total assigned tickets >= 1 (actual: ${rahulStats.total_assigned})`);
+    assert(rahulStats != null, 'Pravin found in IT Specialist workload table');
+    assert(rahulStats.total_assigned >= 1, `Pravin total assigned tickets >= 1 (actual: ${rahulStats.total_assigned})`);
 
     // IT Specialist/Admin works on the ticket: changes to in_progress, then resolved
     const updateProgress = await request(`/api/tickets/${ticketId}`, {

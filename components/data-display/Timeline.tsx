@@ -64,41 +64,41 @@ export function Timeline({
   return (
     <div className={cn('relative pl-6 space-y-6', className)}>
       {/* Vertical line */}
-      <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-slate-200" aria-hidden="true" />
+      <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-slate-200 dark:bg-slate-800" aria-hidden="true" />
 
       {items.map((item) => (
         <div key={item.id} className="relative group">
           {/* Dot */}
           <div
             className={cn(
-              'absolute -left-6 top-1.5 w-3 h-3 rounded-full ring-4 transition-transform group-hover:scale-125',
+              'absolute -left-6 top-1.5 w-3 h-3 rounded-full ring-4 ring-white dark:ring-[#070b18] transition-transform group-hover:scale-125',
               getEventDotColor(item.type)
             )}
           />
 
           {/* Content */}
-          <div className="bg-white p-3.5 rounded-lg border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
+          <div className="bg-white dark:bg-[#0c1428] p-3.5 rounded-lg border border-slate-200/80 dark:border-slate-800 shadow-2xs hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-slate-800">{item.title}</span>
+                <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{item.title}</span>
                 {item.tag && (
-                  <span className="text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+                  <span className="text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
                     {item.tag}
                   </span>
                 )}
               </div>
-              <time className="text-xs text-slate-400 font-mono">
+              <time className="text-xs text-slate-400 dark:text-slate-500 font-mono">
                 {formatDateTime(item.timestamp)}
               </time>
             </div>
 
             {item.description && (
-              <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">{item.description}</p>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">{item.description}</p>
             )}
 
             {item.user && (
-              <div className="mt-2 text-[11px] text-slate-500 flex items-center gap-1.5 font-medium">
-                <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-medium">
+                <svg className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"

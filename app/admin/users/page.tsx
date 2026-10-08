@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { Trash2, AlertTriangle } from 'lucide-react';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { DataTable, Column } from '@/components/data-display/DataTable';
 import { Button } from '@/components/ui/Button';
@@ -15,6 +16,7 @@ import type { UserRole } from '@/lib/permissions';
 
 export default function UserManagementPage() {
   const [users, setUsers] = useState<UserRecord[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -24,6 +26,12 @@ export default function UserManagementPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
+
+  // Modal State for Delete User (Superadmin Only)
+  const [deletingUser, setDeletingUser] = useState<UserRecord | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const [newUser, setNewUser] = useState({
     name: '',
@@ -72,6 +80,46 @@ export default function UserManagementPage() {
   useEffect(() => {
     fetchUsers();
   }, [fetchUsers]);
+
+  // Retrieve authenticated user for role permissions
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.user) setCurrentUser(data.user);
+      })
+      .catch((err) => console.error('Auth check error in users page:', err));
+  }, []);
+
+  const handleOpenDelete = (user: UserRecord) => {
+    setDeleteError(null);
+    setDeletingUser(user);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingUser) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      const res = await fetch(`/api/admin/users/${deletingUser.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete user');
+      }
+
+      setIsDeleteModalOpen(false);
+      setDeletingUser(null);
+      fetchUsers();
+    } catch (err: any) {
+      setDeleteError(err?.message || 'Error deleting user');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -220,16 +268,38 @@ export default function UserManagementPage() {
       key: 'actions',
       header: 'Actions',
       align: 'right',
-      render: (row) => (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => handleOpenEdit(row)}
-          className="text-xs py-1 px-2.5"
-        >
-          Edit / Role →
-        </Button>
-      ),
+      render: (row) => {
+        const isSelf = currentUser?.id === row.id;
+        const isSuperAdminUser = currentUser?.role === 'super_admin';
+
+        return (
+          <div className="flex items-center justify-end gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleOpenEdit(row)}
+              className="text-xs py-1 px-2.5"
+            >
+              Edit / Role →
+            </Button>
+
+            {isSuperAdminUser && (
+              <button
+                type="button"
+                onClick={() => handleOpenDelete(row)}
+                disabled={isSelf}
+                title={isSelf ? 'Cannot delete current logged-in account' : `Delete ${row.name}`}
+                className={`p-1.5 rounded-lg transition-colors border ${isSelf
+                  ? 'text-slate-400 dark:text-slate-600 border-transparent cursor-not-allowed opacity-30'
+                  : 'text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 border-transparent hover:border-rose-200 dark:hover:border-rose-900/60'
+                  }`}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -237,7 +307,7 @@ export default function UserManagementPage() {
     <div className="space-y-6">
       <PageHeader
         title="Enterprise User & Access Management"
-        description="Super Admin authority to create users, assign roles (super_admin, admin, employee), manage IT specialist designations, and control account status."
+        description="Administrator authority to manage application users, assign roles (super_admin, admin, employee), manage staff designations, and control account status."
         action={
           <Button
             variant="primary"
@@ -309,7 +379,7 @@ export default function UserManagementPage() {
       >
         <form onSubmit={handleCreateUser} className="space-y-4">
           {modalError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg">
+            <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs rounded-lg">
               {modalError}
             </div>
           )}
@@ -372,12 +442,12 @@ export default function UserManagementPage() {
               label="Linked Employee Code"
               value={newUser.employee_id}
               onChange={(e) => setNewUser((prev) => ({ ...prev, employee_id: e.target.value }))}
-              placeholder="e.g. EMP-1001"
+              placeholder="e.g. TGS-001"
               helperText="Links this user account to physical equipment and assigned desk"
             />
           )}
 
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
             <Button variant="ghost" size="sm" type="button" onClick={() => setIsAddModalOpen(false)}>
               Cancel
             </Button>
@@ -398,7 +468,7 @@ export default function UserManagementPage() {
         >
           <form onSubmit={handleUpdateUser} className="space-y-4">
             {modalError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg">
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs rounded-lg">
                 {modalError}
               </div>
             )}
@@ -444,7 +514,7 @@ export default function UserManagementPage() {
                 label="Linked Employee Code"
                 value={editFormData.employee_id}
                 onChange={(e) => setEditFormData((prev) => ({ ...prev, employee_id: e.target.value }))}
-                placeholder="e.g. EMP-1001"
+                placeholder="e.g. TGS-001"
               />
             )}
 
@@ -468,7 +538,7 @@ export default function UserManagementPage() {
               placeholder="Leave blank to keep existing password"
             />
 
-            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
               <Button variant="ghost" size="sm" type="button" onClick={() => setEditingUser(null)}>
                 Cancel
               </Button>
@@ -477,6 +547,86 @@ export default function UserManagementPage() {
               </Button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Delete User Confirmation Modal (Superadmin Only) */}
+      {isDeleteModalOpen && deletingUser && (
+        <Modal
+          isOpen={isDeleteModalOpen}
+          onClose={() => {
+            if (!isDeleting) {
+              setIsDeleteModalOpen(false);
+              setDeletingUser(null);
+            }
+          }}
+          title="Delete User Account"
+        >
+          <div className="space-y-4">
+            {deleteError && (
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 text-xs rounded-lg">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="flex items-start gap-3 p-3.5 bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200/60 dark:border-rose-900/40 rounded-xl">
+              <div className="p-2 rounded-lg bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 shrink-0">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Permanently delete this user?
+                </p>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
+                  Are you sure you want to delete <span className="font-bold text-slate-800 dark:text-slate-200">{deletingUser.name}</span> (<span className="font-mono text-slate-700 dark:text-slate-300">{deletingUser.email}</span>)?
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-800 text-xs space-y-1.5">
+              <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                <span>Account Role:</span>
+                <span className="font-bold uppercase text-slate-900 dark:text-white">{deletingUser.role}</span>
+              </div>
+              <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                <span>Designation:</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200">{deletingUser.designation || 'N/A'}</span>
+              </div>
+              {deletingUser.employee_id && (
+                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                  <span>Employee Code:</span>
+                  <span className="font-mono font-medium text-indigo-600 dark:text-indigo-400">{deletingUser.employee_id}</span>
+                </div>
+              )}
+            </div>
+
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 italic">
+              This will revoke login and system access immediately. This action cannot be undone.
+            </p>
+
+            <div className="flex justify-end gap-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsDeleteModalOpen(false);
+                  setDeletingUser(null);
+                }}
+                disabled={isDeleting}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                onClick={handleConfirmDelete}
+                isLoading={isDeleting}
+                icon={<Trash2 className="w-4 h-4" />}
+              >
+                Confirm Delete
+              </Button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>

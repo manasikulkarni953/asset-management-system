@@ -5,15 +5,36 @@ declare global {
   var __dbHealthChecked: boolean | undefined;
 }
 
+function sanitizeHost(rawHost?: string): string {
+  if (!rawHost) return 'localhost';
+  let host = rawHost.trim();
+  // Strip protocol if mistakenly passed (e.g. https:// or http://)
+  host = host.replace(/^https?:\/\//i, '');
+  // Strip trailing slashes or URL paths (e.g. auth-db1274.hstgr.io/ or auth-db1274.hstgr.io/db)
+  host = host.replace(/\/.*$/, '');
+  // Strip port if accidentally part of host (e.g. auth-db1274.hstgr.io:3306)
+  if (host.includes(':')) {
+    host = host.split(':')[0];
+  }
+  return host.trim() || 'localhost';
+}
+
+function sanitizePort(rawPort?: string | number): number {
+  if (!rawPort) return 3306;
+  const parsed = parseInt(String(rawPort).trim(), 10);
+  return isNaN(parsed) || parsed <= 0 ? 3306 : parsed;
+}
+
 const dbConfig = {
-  host: process.env.DB_HOST || 'localhost',
-  port: Number(process.env.DB_PORT) || 3306,
-  user: process.env.DB_USER || 'root',
+  host: sanitizeHost(process.env.DB_HOST),
+  port: sanitizePort(process.env.DB_PORT),
+  user: (process.env.DB_USER || 'root').trim(),
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'asset_management',
+  database: (process.env.DB_NAME || 'asset_management').trim(),
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 5, // Serverless-optimized limit for Vercel lambdas
   queueLimit: 0,
+  connectTimeout: 10000, // 10s connection timeout prevents hangs
   enableKeepAlive: true,
   keepAliveInitialDelay: 0,
   timezone: '+00:00',
@@ -22,6 +43,14 @@ const dbConfig = {
 
 export function getPool(): Pool {
   if (!global.__mysqlPool) {
+    console.log('[DB] Initializing MySQL pool:', {
+      host: dbConfig.host,
+      port: dbConfig.port,
+      user: dbConfig.user,
+      database: dbConfig.database,
+      connectionLimit: dbConfig.connectionLimit,
+      hasPassword: Boolean(dbConfig.password && dbConfig.password.length > 0),
+    });
     global.__mysqlPool = mysql.createPool(dbConfig);
   }
   return global.__mysqlPool;
@@ -33,9 +62,11 @@ export async function query<T = any>(sql: string, params?: any[]): Promise<T[]> 
     const [rows] = await pool.query(sql, params);
     return rows as T[];
   } catch (error: any) {
-    console.error('MySQL Query Error:', {
-      message: error.message,
-      code: error.code,
+    console.error('[DB] MySQL Query Error:', {
+      message: error?.message,
+      code: error?.code,
+      errno: error?.errno,
+      sqlState: error?.sqlState,
       sql: sql.replace(/\s+/g, ' ').trim(),
     });
     throw error;
@@ -55,9 +86,11 @@ export async function execute(
       affectedRows: r.affectedRows || 0,
     };
   } catch (error: any) {
-    console.error('MySQL Execute Error:', {
-      message: error.message,
-      code: error.code,
+    console.error('[DB] MySQL Execute Error:', {
+      message: error?.message,
+      code: error?.code,
+      errno: error?.errno,
+      sqlState: error?.sqlState,
       sql: sql.replace(/\s+/g, ' ').trim(),
     });
     throw error;

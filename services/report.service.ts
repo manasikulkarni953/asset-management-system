@@ -6,9 +6,19 @@ export interface DashboardMetrics {
   inStockAssets: number;
   underMaintenanceAssets: number;
   retiredAssets: number;
+  missingAssets: number;
+  addedThisMonth: number;
   totalEmployees: number;
   openTickets: number;
   criticalTickets: number;
+  ticketBreakdown: {
+    total: number;
+    open: number;
+    in_progress: number;
+    resolved: number;
+    critical: number;
+    high: number;
+  };
   expiringWarranty: number;
   expiringInsurance: number;
   recentActivity: Array<{
@@ -23,11 +33,20 @@ export interface DashboardMetrics {
     id: number;
     ticket_id: string;
     issue_category: string;
+    issue_description?: string;
     priority: string;
     status: string;
     created_at: string;
     asset_number: string;
     employee_name: string;
+  }>;
+  recentAssets: Array<{
+    id: number;
+    asset_number: string;
+    asset_name: string;
+    status: string;
+    assigned_to: string;
+    created_at: string;
   }>;
   categoryDistribution: Array<{
     category: string;
@@ -54,14 +73,16 @@ export class ReportService {
       SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN status = 'assigned' THEN 1 ELSE 0 END) as assigned,
-        SUM(CASE WHEN status = 'in_stock' THEN 1 ELSE 0 END) as in_stock,
-        SUM(CASE WHEN status = 'under_maintenance' THEN 1 ELSE 0 END) as maintenance,
-        SUM(CASE WHEN status = 'retired' THEN 1 ELSE 0 END) as retired
+        SUM(CASE WHEN status IN ('in_stock', 'available') THEN 1 ELSE 0 END) as in_stock,
+        SUM(CASE WHEN status IN ('under_maintenance', 'repair') THEN 1 ELSE 0 END) as maintenance,
+        SUM(CASE WHEN status IN ('retired', 'disposal', 'disposed') THEN 1 ELSE 0 END) as retired,
+        SUM(CASE WHEN status IN ('missing', 'lost', 'unavailable') THEN 1 ELSE 0 END) as missing,
+        SUM(CASE WHEN created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) THEN 1 ELSE 0 END) as added_this_month
       FROM assets
     `);
 
     const [empCount] = await query<any>(`
-      SELECT COUNT(*) as total FROM employees WHERE status = 'active'
+      SELECT COUNT(*) as total FROM employee WHERE status = 'active' OR is_active = 1
     `);
 
     const [ticketCounts] = await query<any>(`
@@ -70,6 +91,17 @@ export class ReportService {
         SUM(CASE WHEN priority = 'critical' THEN 1 ELSE 0 END) as critical_total
       FROM tickets 
       WHERE status NOT IN ('resolved', 'closed')
+    `);
+
+    const [ticketBreakdownRow] = await query<any>(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN status IN ('new', 'open') THEN 1 ELSE 0 END) as open_count,
+        SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress_count,
+        SUM(CASE WHEN status IN ('resolved', 'closed') THEN 1 ELSE 0 END) as resolved_count,
+        SUM(CASE WHEN priority = 'critical' THEN 1 ELSE 0 END) as critical_count,
+        SUM(CASE WHEN priority = 'high' THEN 1 ELSE 0 END) as high_count
+      FROM tickets
     `);
 
     const [warrantyCount] = await query<any>(`
@@ -107,15 +139,30 @@ export class ReportService {
         t.id,
         t.ticket_id,
         t.issue_category,
+        t.issue_description,
         t.priority,
         t.status,
         t.created_at,
-        a.asset_number,
-        e.name as employee_name
+        COALESCE(a.asset_number, '-') as asset_number,
+        COALESCE(e.name, e.full_name, 'Unknown') as employee_name
       FROM tickets t
-      JOIN assets a ON t.asset_id = a.id
-      JOIN employees e ON t.employee_id = e.id
+      LEFT JOIN assets a ON t.asset_id = a.id
+      LEFT JOIN employee e ON t.employee_id = e.id
       ORDER BY t.created_at DESC
+      LIMIT 5
+    `);
+
+    const recentAssets = await query<any>(`
+      SELECT 
+        a.id,
+        a.asset_number,
+        TRIM(CONCAT(COALESCE(a.brand, ''), ' ', COALESCE(a.model, ''))) as asset_name,
+        a.status,
+        COALESCE(e.name, e.full_name, '-') as assigned_to,
+        COALESCE(a.created_at, a.purchase_date, CURDATE()) as created_at
+      FROM assets a
+      LEFT JOIN employee e ON a.current_employee_id = e.id
+      ORDER BY a.created_at DESC
       LIMIT 5
     `);
 
@@ -152,13 +199,24 @@ export class ReportService {
       inStockAssets: Number(assetCounts?.in_stock || 0),
       underMaintenanceAssets: Number(assetCounts?.maintenance || 0),
       retiredAssets: Number(assetCounts?.retired || 0),
+      missingAssets: Number(assetCounts?.missing || 0),
+      addedThisMonth: Number(assetCounts?.added_this_month || 0),
       totalEmployees: Number(empCount?.total || 0),
       openTickets: Number(ticketCounts?.open_total || 0),
       criticalTickets: Number(ticketCounts?.critical_total || 0),
+      ticketBreakdown: {
+        total: Number(ticketBreakdownRow?.total || 0),
+        open: Number(ticketBreakdownRow?.open_count || 0),
+        in_progress: Number(ticketBreakdownRow?.in_progress_count || 0),
+        resolved: Number(ticketBreakdownRow?.resolved_count || 0),
+        critical: Number(ticketBreakdownRow?.critical_count || 0),
+        high: Number(ticketBreakdownRow?.high_count || 0),
+      },
       expiringWarranty: Number(warrantyCount?.total || 0),
       expiringInsurance: Number(insuranceCount?.total || 0),
       recentActivity,
       recentTickets,
+      recentAssets,
       categoryDistribution,
       warrantyAlerts,
       insuranceAlerts,
@@ -190,10 +248,10 @@ export class ReportService {
         a.vendor as "Vendor",
         a.warranty_expiry as "Warranty Expiry",
         a.status as "Status",
-        IFNULL(e.name, 'Unassigned') as "Current Employee",
+        IFNULL(COALESCE(e.name, e.full_name), 'Unassigned') as "Current Employee",
         IFNULL(e.department, '-') as "Department"
        FROM assets a
-       LEFT JOIN employees e ON a.current_employee_id = e.id
+       LEFT JOIN employee e ON a.current_employee_id = e.id
        WHERE ${conditions.join(' AND ')}
        ORDER BY a.asset_number ASC`,
       params
@@ -211,19 +269,19 @@ export class ReportService {
 
     return query(
       `SELECT 
-        e.employee_id as "Employee ID",
-        e.name as "Employee Name",
-        e.department as "Department",
-        e.designation as "Designation",
+        COALESCE(e.employee_id, CONCAT('TGS-', LPAD(e.id, 3, '0'))) as "Employee ID",
+        COALESCE(e.name, e.full_name) as "Employee Name",
+        COALESCE(e.department, 'Operations') as "Department",
+        COALESCE(e.designation, e.job_title, 'Staff') as "Designation",
         e.email as "Email",
-        e.location as "Location",
+        COALESCE(e.location, 'The Space') as "Location",
         (SELECT COUNT(*) FROM assets a2 WHERE a2.current_employee_id = e.id AND a2.status = 'assigned') as "Total Current Assets",
         IFNULL(a.asset_number, 'None') as "Assigned Asset Number",
         IFNULL(a.category, '-') as "Asset Category",
         IFNULL(a.model, '-') as "Asset Model",
         IFNULL(a.status, 'No Assets') as "Status",
         IFNULL(aa.assigned_date, '-') as "Assigned Date"
-       FROM employees e
+       FROM employee e
        LEFT JOIN assets a ON e.id = a.current_employee_id AND a.status = 'assigned'
        LEFT JOIN asset_assignments aa ON a.id = aa.asset_id AND aa.employee_id = e.id AND aa.status = 'assigned'
        WHERE ${conditions.join(' AND ')}
@@ -250,8 +308,8 @@ export class ReportService {
         t.ticket_id as "Ticket ID",
         a.asset_number as "Asset Number",
         a.model as "Asset Model",
-        e.name as "Employee Name",
-        e.department as "Department",
+        COALESCE(e.name, e.full_name) as "Employee Name",
+        COALESCE(e.department, 'Operations') as "Department",
         t.issue_category as "Issue Category",
         t.priority as "Priority",
         t.status as "Status",
@@ -261,7 +319,7 @@ export class ReportService {
         IFNULL(t.resolution, '-') as "Resolution"
        FROM tickets t
        JOIN assets a ON t.asset_id = a.id
-       JOIN employees e ON t.employee_id = e.id
+       JOIN employee e ON t.employee_id = e.id
        LEFT JOIN users u ON t.assigned_to_user_id = u.id
        WHERE ${conditions.join(' AND ')}
        ORDER BY t.created_at DESC`,

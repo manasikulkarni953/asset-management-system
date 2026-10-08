@@ -9,6 +9,7 @@ export interface Employee {
   designation: string;
   location: string;
   workstation?: string | null;
+  phone_number?: string | null;
   status: EmployeeStatus;
   asset_count?: number;
   created_at: string;

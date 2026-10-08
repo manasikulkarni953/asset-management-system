@@ -72,8 +72,8 @@ export default function ReportsPage() {
           header: key,
           render: (row) => {
             const val = row[key];
-            if (val === null || val === undefined || val === '') return <span className="text-slate-300">-</span>;
-            return <span className="text-xs text-slate-700">{String(val)}</span>;
+            if (val === null || val === undefined || val === '') return <span className="text-slate-300 dark:text-slate-600">-</span>;
+            return <span className="text-xs text-slate-700 dark:text-slate-200">{String(val)}</span>;
           },
         }))
       : [];
@@ -109,7 +109,7 @@ export default function ReportsPage() {
       />
 
       {/* Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
         {reportTabs.map((tab) => {
           const isActive = reportType === tab.type;
           return (
@@ -120,14 +120,14 @@ export default function ReportsPage() {
               className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-2 ${
                 isActive
                   ? 'bg-blue-600 text-white shadow-xs'
-                  : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+                  : 'bg-white dark:bg-[#0b1224] text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#0e172e] border border-slate-200 dark:border-slate-800'
               }`}
             >
               <span>{tab.label}</span>
               {tab.count !== null && (
                 <span
                   className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                    isActive ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-600'
+                    isActive ? 'bg-blue-700 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                   }`}
                 >
                   {tab.count}

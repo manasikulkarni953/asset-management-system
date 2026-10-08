@@ -216,7 +216,7 @@ export default function TicketDetailsPage({
       />
 
       {/* Lifecycle Progression Indicator */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+      <div className="bg-white dark:bg-[#0b1224] border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
         <div className="flex items-center justify-between overflow-x-auto pb-1 gap-2">
           {[
             { key: 'new', label: '1. New' },
@@ -224,10 +224,9 @@ export default function TicketDetailsPage({
             { key: 'in_progress', label: '3. In Progress' },
             { key: 'waiting_for_user', label: '4. Waiting User' },
             { key: 'resolved', label: '5. Resolved' },
-            { key: 'closed', label: '6. Closed' },
           ].map((step, idx) => {
             const isCurrent = ticket.status === step.key;
-            const statusOrder = ['new', 'assigned', 'in_progress', 'waiting_for_user', 'resolved', 'closed'];
+            const statusOrder = ['new', 'assigned', 'in_progress', 'waiting_for_user', 'resolved'];
             const currentIndex = statusOrder.indexOf(ticket.status);
             const isPassed = currentIndex >= idx;
             return (
@@ -235,10 +234,10 @@ export default function TicketDetailsPage({
                 <div
                   className={`w-full py-2 px-2.5 rounded-lg text-center text-xs font-bold transition-all ${
                     isCurrent
-                      ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-300'
+                      ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-300 dark:ring-blue-700'
                       : isPassed
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
-                      : 'bg-slate-50 text-slate-400 border border-slate-200'
+                      ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60'
+                      : 'bg-slate-50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-400 border border-slate-200 dark:border-slate-700/60'
                   }`}
                 >
                   {step.label}
@@ -259,11 +258,18 @@ export default function TicketDetailsPage({
                 {ticket.asset_number}
               </span>
               {!isEmployee && (
-                <Link href={`/assets/${ticket.asset_id}`}>
-                  <Button variant="ghost" size="sm" className="text-xs p-1 h-auto text-blue-600">
-                    View Asset →
-                  </Button>
-                </Link>
+                <div className="flex items-center gap-1.5">
+                  <Link href={`/damaged-assets`}>
+                    <Button variant="outline" size="sm" className="text-xs p-1 px-2 h-auto text-amber-600 border-amber-200 hover:bg-amber-50">
+                      Report Damage
+                    </Button>
+                  </Link>
+                  <Link href={`/assets/${ticket.asset_id}`}>
+                    <Button variant="ghost" size="sm" className="text-xs p-1 h-auto text-blue-600">
+                      View Asset →
+                    </Button>
+                  </Link>
+                </div>
               )}
             </div>
             <p className="text-xs font-semibold text-slate-800">
@@ -331,44 +337,44 @@ export default function TicketDetailsPage({
 
       {/* Ticket Physical Location */}
       <Card title="Ticket Location" subtitle="Fixed physical facility and specific desk/workstation identity">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 p-4 bg-slate-50 rounded-xl border border-slate-200">
-          <div className="p-3 bg-white border border-slate-200 rounded-lg">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 p-4 bg-slate-50 dark:bg-[#0c1428]/60 rounded-xl border border-slate-200 dark:border-slate-800">
+          <div className="p-3 bg-white dark:bg-[#0b1224] border border-slate-200 dark:border-slate-800 rounded-lg shadow-2xs">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 block">
               Building
             </span>
-            <p className="text-sm font-bold text-slate-900 mt-1 flex items-center gap-1.5">
-              <Building2 className="w-4 h-4 text-indigo-600" />
+            <p className="text-sm font-bold text-slate-900 dark:text-white mt-1 flex items-center gap-1.5">
+              <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               {ticket.raised_building || 'The Space'}
             </p>
-            <span className="text-[11px] text-slate-400 mt-0.5 block">Corporate Facility</span>
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 block">Corporate Facility</span>
           </div>
 
-          <div className="p-3 bg-white border border-slate-200 rounded-lg">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+          <div className="p-3 bg-white dark:bg-[#0b1224] border border-slate-200 dark:border-slate-800 rounded-lg shadow-2xs">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500 block">
               Floor
             </span>
-            <p className="text-sm font-bold text-slate-900 mt-1 flex items-center gap-1.5">
-              <Layers className="w-4 h-4 text-indigo-600" />
+            <p className="text-sm font-bold text-slate-900 dark:text-white mt-1 flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               {ticket.raised_floor || '5th Floor'}
             </p>
-            <span className="text-[11px] text-slate-400 mt-0.5 block">Assigned Work Level</span>
+            <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 block">Assigned Work Level</span>
           </div>
 
-          <div className="p-3 bg-white border-2 border-indigo-200 rounded-lg shadow-xs">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-900 block flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-indigo-600" /> Workstation / Desk No.
+          <div className="p-3 bg-white dark:bg-[#0b1224] border-2 border-indigo-200 dark:border-indigo-800/80 rounded-lg shadow-2xs">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-indigo-900 dark:text-indigo-300 block flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Workstation / Desk No.
             </span>
-            <p className="font-mono text-base font-extrabold text-indigo-950 mt-1">
+            <p className="font-mono text-base font-extrabold text-indigo-950 dark:text-white mt-1">
               {ticket.raised_workstation || 'Not Specified'}
             </p>
-            <span className="text-[11px] text-indigo-600/80 mt-0.5 block">Physical Incident Desk</span>
+            <span className="text-[11px] text-indigo-600/80 dark:text-indigo-400 mt-0.5 block">Physical Incident Desk</span>
           </div>
         </div>
       </Card>
 
       {/* Issue Details Card */}
       <Card title="Incident Symptom & Description">
-        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
+        <div className="p-4 bg-slate-50 dark:bg-[#0c1428]/60 rounded-xl border border-slate-200 dark:border-slate-800 text-sm text-slate-800 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">
           {ticket.issue_description}
         </div>
       </Card>
@@ -376,7 +382,7 @@ export default function TicketDetailsPage({
       {/* Resolution details if present */}
       {ticket.resolution && (
         <Card title="Documented Resolution">
-          <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl text-sm text-emerald-900 leading-relaxed whitespace-pre-wrap">
+          <div className="p-4 bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 rounded-xl text-sm text-emerald-900 dark:text-emerald-200 leading-relaxed whitespace-pre-wrap">
             {ticket.resolution}
           </div>
         </Card>
@@ -421,7 +427,6 @@ export default function TicketDetailsPage({
                   { value: 'in_progress', label: 'In Progress' },
                   { value: 'waiting_for_user', label: 'Waiting for User' },
                   { value: 'resolved', label: 'Resolved' },
-                  { value: 'closed', label: 'Closed' },
                 ]}
                 value={newStatus}
                 onChange={(e) => setNewStatus(e.target.value)}

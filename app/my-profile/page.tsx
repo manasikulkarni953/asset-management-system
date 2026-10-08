@@ -105,29 +105,29 @@ export default function MyProfilePage() {
 
       {/* Staff Profile Overview */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3.5">
-        <div className="p-4 bg-white rounded-xl border border-slate-200">
-          <span className="text-[10px] font-bold uppercase text-slate-400">Employee Code</span>
-          <p className="text-base font-bold text-slate-900 mt-0.5 font-mono">{employee?.employee_id || '—'}</p>
+        <div className="p-4 bg-white dark:bg-[#0b1224] rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <span className="text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500">Employee Code</span>
+          <p className="text-base font-bold text-slate-900 dark:text-white mt-0.5 font-mono">{employee?.employee_id || '—'}</p>
         </div>
-        <div className="p-4 bg-white rounded-xl border border-slate-200">
-          <span className="text-[10px] font-bold uppercase text-slate-400">Corporate Email</span>
-          <p className="text-xs font-semibold text-slate-900 mt-1 truncate">{employee?.email || '—'}</p>
+        <div className="p-4 bg-white dark:bg-[#0b1224] rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <span className="text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500">Corporate Email</span>
+          <p className="text-xs font-semibold text-slate-900 dark:text-white mt-1 truncate">{employee?.email || '—'}</p>
         </div>
-        <div className="p-4 bg-white rounded-xl border border-slate-200">
-          <span className="text-[10px] font-bold uppercase text-slate-400">Department</span>
-          <p className="text-sm font-semibold text-slate-900 mt-0.5">{employee?.department || '—'}</p>
+        <div className="p-4 bg-white dark:bg-[#0b1224] rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <span className="text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500">Department</span>
+          <p className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5">{employee?.department || '—'}</p>
         </div>
-        <div className="p-4 bg-white rounded-xl border border-slate-200">
-          <span className="text-[10px] font-bold uppercase text-slate-400">Designation</span>
-          <p className="text-sm font-semibold text-slate-900 mt-0.5">{employee?.designation || '—'}</p>
+        <div className="p-4 bg-white dark:bg-[#0b1224] rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <span className="text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500">Designation</span>
+          <p className="text-sm font-semibold text-slate-900 dark:text-white mt-0.5">{employee?.designation || '—'}</p>
         </div>
-        <div className="p-4 bg-white rounded-xl border border-slate-200">
-          <span className="text-[10px] font-bold uppercase text-slate-400">Workstation / Desk</span>
-          <p className="text-sm font-bold text-indigo-700 mt-0.5 font-mono">{employee?.workstation || 'Not Assigned'}</p>
+        <div className="p-4 bg-white dark:bg-[#0b1224] rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+          <span className="text-[10px] font-bold uppercase text-slate-400 dark:text-slate-500">Workstation / Desk</span>
+          <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400 mt-0.5 font-mono">{employee?.workstation || 'Not Assigned'}</p>
         </div>
-        <div className="p-4 bg-indigo-50/70 rounded-xl border border-indigo-200">
-          <span className="text-[10px] font-bold uppercase text-indigo-700">Assigned Assets</span>
-          <p className="text-xl font-bold text-indigo-950 mt-0.5 font-mono">
+        <div className="p-4 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl border border-indigo-200 dark:border-indigo-800/60 shadow-2xs">
+          <span className="text-[10px] font-bold uppercase text-indigo-700 dark:text-indigo-300">Assigned Assets</span>
+          <p className="text-xl font-bold text-indigo-950 dark:text-white mt-0.5 font-mono">
             {employee?.current_assets?.length || 0}
           </p>
         </div>
@@ -138,7 +138,7 @@ export default function MyProfilePage() {
         title={
           <div className="flex items-center gap-2">
             <span>My Assigned Equipment</span>
-            <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 text-blue-800">
+            <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-blue-100 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200">
               {employee?.current_assets?.length || 0}
             </span>
           </div>
@@ -161,12 +161,12 @@ export default function MyProfilePage() {
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-2">
               <span>My Support Tickets</span>
-              <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 text-amber-800">
+              <span className="px-2 py-0.5 text-xs font-bold rounded-full bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-200">
                 {tickets.length}
               </span>
             </div>
             <Link href="/tickets">
-              <Button variant="ghost" size="sm" className="text-xs text-blue-600">
+              <Button variant="ghost" size="sm" className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300">
                 View All Tickets →
               </Button>
             </Link>
@@ -174,23 +174,23 @@ export default function MyProfilePage() {
         }
         subtitle="Active and resolved support requests raised for your workstation or assigned equipment."
       >
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y divide-slate-100 dark:divide-slate-800">
           {tickets.length === 0 ? (
-            <p className="text-xs text-slate-400 py-4 text-center">No active tickets.</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 py-4 text-center">No active tickets.</p>
           ) : (
             tickets.slice(0, 5).map((tk) => (
               <div key={tk.id} className="py-3 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-blue-600">{tk.ticket_id}</span>
-                    <span className="font-medium text-xs text-slate-800">{tk.issue_category}</span>
+                    <span className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{tk.ticket_id}</span>
+                    <span className="font-medium text-xs text-slate-800 dark:text-white">{tk.issue_category}</span>
                     <StatusBadge status={tk.status} size="sm" />
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{tk.issue_description}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">{tk.issue_description}</p>
                 </div>
                 <div className="text-right">
-                  <span className="text-[11px] text-slate-400 block">{formatDate(tk.created_at)}</span>
-                  <Link href={`/tickets/${tk.id}`} className="text-xs text-blue-600 hover:underline font-medium">
+                  <span className="text-[11px] text-slate-400 dark:text-slate-500 block">{formatDate(tk.created_at)}</span>
+                  <Link href={`/tickets/${tk.id}`} className="text-xs text-blue-600 dark:text-blue-400 hover:underline font-medium">
                     View Details
                   </Link>
                 </div>

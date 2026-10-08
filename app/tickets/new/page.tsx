@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -22,6 +22,7 @@ function RaiseTicketForm() {
   const [assets, setAssets] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [isLoadingMeta, setIsLoadingMeta] = useState(true);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,11 +41,13 @@ function RaiseTicketForm() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/assets?limit=100').then((r) => r.json()),
-      fetch('/api/employees?limit=100').then((r) => r.json()),
+      fetch('/api/auth/me').then((r) => r.json()).catch(() => ({ user: null })),
+      fetch('/api/assets?limit=200').then((r) => r.json()),
+      fetch('/api/employees?limit=200').then((r) => r.json()),
       fetch('/api/tickets?limit=1').then((r) => r.json()),
     ])
-      .then(([assetData, empData, ticketData]) => {
+      .then(([authData, assetData, empData, ticketData]) => {
+        if (authData?.user) setCurrentUser(authData.user);
         const loadedAssets = assetData.assets || [];
         const loadedEmployees = empData.employees || [];
         if (loadedAssets.length) setAssets(loadedAssets);
@@ -53,14 +56,25 @@ function RaiseTicketForm() {
 
         // Determine active initial employee
         let targetEmpId = defaultEmployeeId;
-        if (defaultAssetId && !defaultEmployeeId && loadedAssets.length) {
+
+        // If logged-in user is an employee, force lock to themselves
+        if (authData?.user?.role === 'employee' && loadedEmployees.length) {
+          const self = loadedEmployees.find(
+            (e: any) =>
+              (authData.user.employee_id && e.employee_id === authData.user.employee_id) ||
+              (authData.user.email && e.email?.toLowerCase() === authData.user.email?.toLowerCase())
+          );
+          if (self) {
+            targetEmpId = String(self.id);
+          }
+        }
+
+        // If not set, deduce from selected asset
+        if (!targetEmpId && defaultAssetId && loadedAssets.length) {
           const selected = loadedAssets.find((a: any) => String(a.id) === defaultAssetId);
           if (selected?.current_employee_id) {
             targetEmpId = String(selected.current_employee_id);
           }
-        }
-        if (!targetEmpId && loadedEmployees.length === 1) {
-          targetEmpId = String(loadedEmployees[0].id);
         }
 
         if (targetEmpId && loadedEmployees.length) {
@@ -75,6 +89,61 @@ function RaiseTicketForm() {
       .catch((err) => console.error('Error fetching metadata:', err))
       .finally(() => setIsLoadingMeta(false));
   }, [defaultAssetId, defaultEmployeeId, explicitWorkstation]);
+
+  // Determine if ticket is locked to a specific custodian employee
+  const targetEmployee = useMemo(() => {
+    if (currentUser?.role === 'employee') {
+      const self = employees.find(
+        (e) =>
+          (currentUser.employee_id && e.employee_id === currentUser.employee_id) ||
+          (currentUser.email && e.email?.toLowerCase() === currentUser.email?.toLowerCase())
+      );
+      if (self) return self;
+    }
+
+    if (defaultEmployeeId) {
+      const match = employees.find(
+        (e) => String(e.id) === String(defaultEmployeeId) || e.employee_id === defaultEmployeeId
+      );
+      if (match) return match;
+    }
+
+    if (formData.asset_id) {
+      const matchAsset = assets.find((a) => String(a.id) === String(formData.asset_id));
+      if (matchAsset?.current_employee_id) {
+        const match = employees.find((e) => e.id === matchAsset.current_employee_id);
+        if (match) return match;
+      }
+    }
+
+    if (formData.employee_id) {
+      const match = employees.find((e) => String(e.id) === String(formData.employee_id));
+      if (match) return match;
+    }
+
+    return null;
+  }, [currentUser, defaultEmployeeId, formData.asset_id, formData.employee_id, employees, assets]);
+
+  // Assets available to choose: if a custodian is targeted, only show their assigned assets
+  const availableAssets = useMemo(() => {
+    if (targetEmployee) {
+      const empAssets = assets.filter((a) => a.current_employee_id === targetEmployee.id);
+      if (defaultAssetId && !empAssets.some((a) => String(a.id) === String(defaultAssetId))) {
+        const selected = assets.find((a) => String(a.id) === String(defaultAssetId));
+        if (selected) empAssets.unshift(selected);
+      }
+      return empAssets.length > 0 ? empAssets : assets;
+    }
+    return assets;
+  }, [targetEmployee, assets, defaultAssetId]);
+
+  // Available employee options: when locked/targeted, ONLY show that specific employee
+  const availableEmployees = useMemo(() => {
+    if (targetEmployee) {
+      return [targetEmployee];
+    }
+    return employees;
+  }, [targetEmployee, employees]);
 
   const handleAssetChange = (selectedId: string) => {
     const match = assets.find((a) => String(a.id) === selectedId);
@@ -167,8 +236,8 @@ function RaiseTicketForm() {
       />
 
       {error && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700 flex items-start gap-2.5">
-          <span className="font-bold text-rose-600">⚠️</span>
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-xl text-sm text-rose-700 dark:text-rose-300 flex items-start gap-2.5">
+          <span className="font-bold text-rose-600 dark:text-rose-400">⚠️</span>
           <span>{error}</span>
         </div>
       )}
@@ -185,7 +254,7 @@ function RaiseTicketForm() {
                 required
                 options={[
                   { value: '', label: '-- Select Equipment --' },
-                  ...assets.map((a) => ({
+                  ...availableAssets.map((a) => ({
                     value: a.id,
                     label: `${a.asset_number} — ${a.brand} ${a.model} (${a.category})`,
                   })),
@@ -198,13 +267,23 @@ function RaiseTicketForm() {
               <Select
                 label="Reporting Employee Custodian"
                 required
-                options={[
-                  { value: '', label: '-- Select Employee --' },
-                  ...employees.map((e) => ({
-                    value: e.id,
-                    label: `${e.name} (${e.employee_id}) — ${e.workstation ? `${e.workstation} • ` : ''}${e.department}`,
-                  })),
-                ]}
+                disabled={Boolean(targetEmployee)}
+                options={
+                  targetEmployee
+                    ? [
+                        {
+                          value: targetEmployee.id,
+                          label: `${targetEmployee.name} (${targetEmployee.employee_id}) — ${targetEmployee.workstation ? `${targetEmployee.workstation} • ` : ''}${targetEmployee.department}`,
+                        },
+                      ]
+                    : [
+                        { value: '', label: '-- Select Employee --' },
+                        ...availableEmployees.map((e) => ({
+                          value: e.id,
+                          label: `${e.name} (${e.employee_id}) — ${e.workstation ? `${e.workstation} • ` : ''}${e.department}`,
+                        })),
+                      ]
+                }
                 value={formData.employee_id}
                 onChange={(e) => handleEmployeeChange(e.target.value)}
               />
@@ -217,50 +296,50 @@ function RaiseTicketForm() {
               borderTop
             >
               <div className="md:col-span-2 lg:col-span-3">
-                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <div className="p-4 bg-slate-50 dark:bg-[#0c1428]/60 border border-slate-200 dark:border-slate-800 rounded-xl space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
                     {/* Fixed Building (Read Only) */}
-                    <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                    <div className="p-3 bg-white dark:bg-[#0b1224] border border-slate-200 dark:border-slate-800 rounded-lg shadow-2xs">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">
                           Building
                         </span>
-                        <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                        <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                           Read Only
                         </span>
                       </div>
-                      <p className="text-sm font-bold text-slate-900 mt-1 flex items-center gap-1.5">
-                        <Building2 className="w-4 h-4 text-indigo-600" />
+                      <p className="text-sm font-bold text-slate-900 dark:text-white mt-1 flex items-center gap-1.5">
+                        <Building2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                         The Space
                       </p>
-                      <span className="text-[11px] text-slate-400 mt-0.5 block">Corporate Facility</span>
+                      <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 block">Corporate Facility</span>
                     </div>
 
                     {/* Fixed Floor (Read Only) */}
-                    <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                    <div className="p-3 bg-white dark:bg-[#0b1224] border border-slate-200 dark:border-slate-800 rounded-lg shadow-2xs">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 dark:text-slate-500">
                           Floor
                         </span>
-                        <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 border border-slate-200">
+                        <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                           Read Only
                         </span>
                       </div>
-                      <p className="text-sm font-bold text-slate-900 mt-1 flex items-center gap-1.5">
-                        <Layers className="w-4 h-4 text-indigo-600" />
+                      <p className="text-sm font-bold text-slate-900 dark:text-white mt-1 flex items-center gap-1.5">
+                        <Layers className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                         5th Floor
                       </p>
-                      <span className="text-[11px] text-slate-400 mt-0.5 block">Assigned Work Level</span>
+                      <span className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 block">Assigned Work Level</span>
                     </div>
 
                     {/* Workstation / Desk No. (Editable) */}
-                    <div className="p-3 bg-white border-2 border-indigo-200 rounded-lg shadow-xs flex flex-col justify-between">
+                    <div className="p-3 bg-white dark:bg-[#0b1224] border-2 border-indigo-200 dark:border-indigo-800/80 rounded-lg shadow-2xs flex flex-col justify-between">
                       <div>
                         <div className="flex items-center justify-between mb-1">
-                          <label htmlFor="raised_workstation" className="text-[10px] uppercase font-bold tracking-wider text-indigo-900 flex items-center gap-1">
-                            <MapPin className="w-3.5 h-3.5 text-indigo-600" /> Workstation / Desk No. *
+                          <label htmlFor="raised_workstation" className="text-[10px] uppercase font-bold tracking-wider text-indigo-900 dark:text-indigo-300 flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Workstation / Desk No. *
                           </label>
-                          <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                          <span className="text-[9px] uppercase font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300">
                             Editable
                           </span>
                         </div>
@@ -271,12 +350,12 @@ function RaiseTicketForm() {
                           onChange={(e) =>
                             setFormData((prev) => ({ ...prev, raised_workstation: e.target.value }))
                           }
-                          placeholder="e.g. WS-5-042"
-                          className="font-mono text-sm font-bold text-slate-900 mt-0.5 h-9"
+                          placeholder="e.g. WS-05-001"
+                          className="font-mono text-sm font-bold text-slate-900 dark:text-white mt-0.5 h-9"
                           helperText={
                             employees.find((e) => String(e.id) === formData.employee_id)?.workstation
                               ? `Assigned desk: ${employees.find((e) => String(e.id) === formData.employee_id)?.workstation}`
-                              : 'Physical desk where issue is reported (e.g. WS-5-042)'
+                              : 'Physical desk where issue is reported (e.g. WS-05-001)'
                           }
                         />
                       </div>

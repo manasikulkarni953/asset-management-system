@@ -40,6 +40,7 @@ export const transferAssetSchema = z.object({
 
 export const returnAssetSchema = z.object({
   asset_id: z.coerce.number().positive('Asset ID is required'),
+  return_to: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
 

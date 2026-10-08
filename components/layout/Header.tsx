@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '../ui/Button';
+import { ThemeToggle } from '../theme/ThemeToggle';
+import { NotificationBell } from './NotificationBell';
 
 export interface HeaderProps {
   onMenuClick: () => void;
@@ -33,13 +34,13 @@ export function Header({ onMenuClick, user }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 sm:px-6 flex items-center justify-between">
+    <header className="sticky top-0 z-30 h-16 bg-white/95 dark:bg-[#0b1224]/95 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 sm:px-6 flex items-center justify-between transition-colors duration-200">
       {/* Left side: hamburger for mobile */}
       <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={onMenuClick}
-          className="lg:hidden p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 focus:outline-none"
+          className="lg:hidden p-2 rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 focus:outline-none transition-colors"
           aria-label="Toggle Navigation"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -47,35 +48,26 @@ export function Header({ onMenuClick, user }: HeaderProps) {
           </svg>
         </button>
 
-        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
-          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-          <span className="font-medium text-slate-700">Enterprise Database</span>
-          <span className="text-slate-400">/</span>
-          <span>AssetFlow</span>
+        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="font-semibold text-slate-700 dark:text-slate-200">Enterprise Database</span>
+          <span className="text-slate-400 dark:text-slate-600">/</span>
+          <span className="font-medium text-slate-800 dark:text-slate-200">DemandTrack</span>
         </div>
       </div>
 
-      {/* Right side: quick scan button + user info + logout */}
+      {/* Right side: Notification Bell + Theme Toggle + user info + logout */}
       <div className="flex items-center gap-2.5">
-        <Link href="/scan">
-          <Button
-            variant="outline"
-            size="sm"
-            className="hidden sm:inline-flex border-blue-200 text-blue-700 hover:bg-blue-50"
-            icon={
-              <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-              </svg>
-            }
-          >
-            Scan Barcode
-          </Button>
-        </Link>
+        {/* Notifications Bell for IT Admins & Super Admins */}
+        {user?.role !== 'employee' && <NotificationBell />}
+
+        {/* Global Dark / Light Theme Toggle */}
+        <ThemeToggle />
 
         {user && (
-          <div className="hidden md:flex flex-col text-right">
-            <span className="text-xs font-bold text-slate-800">{user.fullName || 'User'}</span>
-            <span className="text-[10px] text-slate-500">{user.email}</span>
+          <div className="hidden md:flex flex-col text-right pl-1">
+            <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{user.fullName || 'User'}</span>
+            <span className="text-[10px] text-slate-500 dark:text-slate-400">{user.email}</span>
           </div>
         )}
 
@@ -84,7 +76,7 @@ export function Header({ onMenuClick, user }: HeaderProps) {
           size="sm"
           onClick={handleLogout}
           isLoading={isLoggingOut}
-          className="text-slate-600 hover:text-rose-600 hover:bg-rose-50"
+          className="text-slate-600 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30"
           title="Sign out"
           icon={
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

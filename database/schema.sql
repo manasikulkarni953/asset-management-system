@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS `employees` (
   `email` VARCHAR(100) NOT NULL UNIQUE,
   `department` VARCHAR(100) NOT NULL,
   `designation` VARCHAR(100) NOT NULL,
-  `location` VARCHAR(100) NOT NULL,
+  `location` VARCHAR(100) NOT NULL DEFAULT 'The Space',
+  `workstation` VARCHAR(50) NULL,
   `status` ENUM('active', 'on_leave', 'terminated') NOT NULL DEFAULT 'active',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -49,6 +50,9 @@ CREATE TABLE IF NOT EXISTS `assets` (
   `purchase_date` DATE NOT NULL,
   `purchase_cost` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
   `vendor` VARCHAR(100) NOT NULL,
+  `vendor_phone` VARCHAR(50) NULL,
+  `vendor_email` VARCHAR(100) NULL,
+  `location` VARCHAR(150) NULL DEFAULT 'The Space',
   `warranty_expiry` DATE NULL,
   `status` ENUM('in_stock', 'assigned', 'under_maintenance', 'retired') NOT NULL DEFAULT 'in_stock',
   `current_employee_id` INT NULL,
@@ -103,6 +107,7 @@ CREATE TABLE IF NOT EXISTS `asset_insurance` (
   `expiry_date` DATE NOT NULL,
   `coverage_amount` DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
   `document_url` VARCHAR(255) NULL,
+  `notes` TEXT NULL,
   `status` ENUM('active', 'expiring', 'expired') NOT NULL DEFAULT 'active',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -116,10 +121,15 @@ CREATE TABLE IF NOT EXISTS `asset_network` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `asset_id` INT NOT NULL UNIQUE,
   `ip_address` VARCHAR(45) NULL,
+  `assignment_type` VARCHAR(20) NOT NULL DEFAULT 'Static',
+  `subnet_mask` VARCHAR(45) NULL DEFAULT '255.255.255.0',
+  `gateway` VARCHAR(45) NULL,
+  `dns_server` VARCHAR(100) NULL,
   `mac_address` VARCHAR(20) NULL,
   `hostname` VARCHAR(100) NULL,
   `network_name` VARCHAR(100) NULL,
   `vlan` VARCHAR(50) NULL,
+  `notes` TEXT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT `fk_network_asset` FOREIGN KEY (`asset_id`) REFERENCES `assets` (`id`) ON DELETE CASCADE,
@@ -177,9 +187,12 @@ VALUES
 ('itadmin', 'itadmin@enterprise.com', '$2b$10$Nq6nkBJUu3zj6atMz0KBiOvZgfnShkhRXyPReEpzd7KfdulrdlZ3y', 'IT Support Lead', 'it_admin', 'active')
 ON DUPLICATE KEY UPDATE `username`=`username`;
 
-INSERT INTO `employees` (`employee_id`, `name`, `email`, `department`, `designation`, `location`, `status`)
+INSERT INTO `employees` (`employee_id`, `name`, `email`, `department`, `designation`, `location`, `workstation`, `status`)
 VALUES
-('EMP-1001', 'Alex Johnson', 'alex.j@enterprise.com', 'Engineering', 'Senior Software Engineer', 'Building A - Floor 3', 'active'),
-('EMP-1002', 'Sarah Connor', 'sarah.c@enterprise.com', 'DevOps & Cloud', 'Lead Infrastructure Engineer', 'Building B - Floor 2', 'active'),
-('EMP-1003', 'Michael Scott', 'michael.s@enterprise.com', 'Product Management', 'Product Director', 'HQ - Floor 5', 'active')
-ON DUPLICATE KEY UPDATE `employee_id`=`employee_id`;
+('TGS-001', 'Alex Johnson', 'alex.j@enterprise.com', 'Engineering', 'Senior Software Engineer', 'The Space', 'WS-05-001', 'active'),
+('TGS-002', 'Jhone Doe', 'jhone.doe@enterprise.com', 'Design', 'UI/UX Designer', 'The Space', 'WS-05-002', 'active'),
+('TGS-003', 'Michael Scott', 'michael.s@enterprise.com', 'Product Management', 'Product Director', 'The Space', 'WS-05-003', 'active'),
+('TGS-004', 'Nakshatra Sulakhe', 'nakshatra.s@enterprise.com', 'DevOps & Cloud', 'DevOps Specialist', 'The Space', 'WS-05-004', 'active'),
+('TGS-005', 'Rutika Rathod', 'rutika.r@enterprise.com', 'Engineering', 'Full Stack Developer', 'The Space', 'WS-05-005', 'active'),
+('TGS-006', 'Sarah Connor', 'sarah.c@enterprise.com', 'DevOps & Cloud', 'Lead Infrastructure Engineer', 'The Space', 'WS-05-006', 'active')
+ON DUPLICATE KEY UPDATE `location`='The Space';

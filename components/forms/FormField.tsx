@@ -27,7 +27,7 @@ export function FormField({
       {label && (
         <label
           htmlFor={htmlFor}
-          className="text-xs font-semibold text-slate-700 tracking-wide flex items-center justify-between"
+          className="text-xs font-semibold text-slate-700 dark:text-slate-300 tracking-wide flex items-center justify-between"
         >
           <span>
             {label}
@@ -36,8 +36,8 @@ export function FormField({
         </label>
       )}
       {children}
-      {error && <span className="text-xs text-rose-600 font-medium">{error}</span>}
-      {!error && helperText && <span className="text-xs text-slate-500">{helperText}</span>}
+      {error && <span className="text-xs text-rose-600 dark:text-rose-400 font-medium">{error}</span>}
+      {!error && helperText && <span className="text-xs text-slate-500 dark:text-slate-400">{helperText}</span>}
     </div>
   );
 }

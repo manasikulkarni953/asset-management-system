@@ -89,10 +89,13 @@ export function getStatusVariant(
     case 'active':
     case 'resolved':
     case 'closed':
+    case 'repaired':
       return 'success';
 
     case 'assigned':
     case 'in_progress':
+    case 'reported':
+    case 'minor':
       return 'info';
 
     case 'under_maintenance':
@@ -100,6 +103,9 @@ export function getStatusVariant(
     case 'on_leave':
     case 'expiring':
     case 'medium':
+    case 'moderate':
+    case 'under_investigation':
+    case 'sent_for_repair':
       return 'warning';
 
     case 'retired':
@@ -107,6 +113,9 @@ export function getStatusVariant(
     case 'expired':
     case 'critical':
     case 'high':
+    case 'severe':
+    case 'total_loss':
+    case 'written_off':
       return 'danger';
 
     case 'new':

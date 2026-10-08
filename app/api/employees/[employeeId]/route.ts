@@ -84,3 +84,34 @@ export async function PUT(
     return NextResponse.json({ error: error?.message || 'Failed to update employee' }, { status: 400 });
   }
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ employeeId: string }> }
+) {
+  try {
+    const user = await getAuthUserFromRequest(req);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized: Authentication required.' }, { status: 401 });
+    }
+    if (!Permissions.canManageEmployees(user)) {
+      return NextResponse.json({ error: 'Forbidden: Insufficient privileges to delete employee records.' }, { status: 403 });
+    }
+
+    const { employeeId } = await params;
+    const id = Number(employeeId);
+    if (isNaN(id)) {
+      return NextResponse.json({ error: 'Invalid employee ID' }, { status: 400 });
+    }
+
+    const result = await EmployeeService.deleteEmployee(id);
+    return NextResponse.json({
+      success: true,
+      message: `Employee ${result.name} (${result.employee_id}) and linked user account permanently deleted.`,
+    });
+  } catch (error: any) {
+    console.error('API /employees/[employeeId] DELETE error:', error);
+    return NextResponse.json({ error: error?.message || 'Failed to delete employee' }, { status: 400 });
+  }
+}
+

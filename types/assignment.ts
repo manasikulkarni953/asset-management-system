@@ -17,5 +17,7 @@ export interface AssetAssignment {
   notes: string | null;
   assigned_by_user_id: number | null;
   assigned_by_name?: string | null;
+  current_asset_status?: string;
+  current_employee_id?: number | null;
   created_at: string;
 }

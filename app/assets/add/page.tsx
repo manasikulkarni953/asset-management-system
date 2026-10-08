@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Card } from '@/components/ui/Card';
@@ -14,39 +14,23 @@ export default function AddAssetPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [employees, setEmployees] = useState<Array<{ id: number; name: string; employee_id: string }>>([]);
 
   const today = new Date().toISOString().split('T')[0];
 
   const [formData, setFormData] = useState({
-    category: 'Laptop',
+    category: 'CPU',
     brand: '',
     model: '',
     serial_number: '',
     purchase_date: today,
     purchase_cost: '',
-    vendor: '',
+    location: 'The Space',
     warranty_expiry: '',
+    vendor: '',
+    vendor_phone: '',
+    vendor_email: '',
     status: 'in_stock',
-    current_employee_id: '',
   });
-
-  useEffect(() => {
-    fetch('/api/employees?limit=100')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.employees) {
-          setEmployees(
-            data.employees.map((e: any) => ({
-              id: e.id,
-              name: e.name,
-              employee_id: e.employee_id,
-            }))
-          );
-        }
-      })
-      .catch((err) => console.error('Failed to load employees:', err));
-  }, []);
 
   const handleChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -65,6 +49,12 @@ export default function AddAssetPage() {
         return;
       }
 
+      if (!formData.vendor.trim()) {
+        setError('Vendor name is required.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const payload: any = {
         category: formData.category.trim(),
         brand: formData.brand.trim(),
@@ -73,13 +63,12 @@ export default function AddAssetPage() {
         purchase_date: formData.purchase_date,
         purchase_cost: parseFloat(formData.purchase_cost) || 0,
         vendor: formData.vendor.trim(),
-        status: formData.status,
-        current_employee_id: formData.current_employee_id ? Number(formData.current_employee_id) : null,
+        vendor_phone: formData.vendor_phone ? formData.vendor_phone.trim() : null,
+        vendor_email: formData.vendor_email ? formData.vendor_email.trim() : null,
+        location: formData.location ? formData.location.trim() : 'The Space',
+        status: 'in_stock',
+        current_employee_id: null,
       };
-
-      // Ensure asset_id and asset_number are never set or sent by client (backend generated)
-      delete payload.asset_id;
-      delete payload.asset_number;
 
       if (formData.warranty_expiry && formData.warranty_expiry.trim()) {
         payload.warranty_expiry = formData.warranty_expiry.trim();
@@ -105,24 +94,21 @@ export default function AddAssetPage() {
   };
 
   const categoryOptions = [
-    { value: 'Laptop', label: 'Laptop (LAP)' },
-    { value: 'Desktop', label: 'Desktop (DSK)' },
+    { value: 'CPU', label: 'Cpu (CPU)' },
     { value: 'Monitor', label: 'Monitor (MON)' },
-    { value: 'Server', label: 'Server (SVR)' },
-    { value: 'Mobile', label: 'Mobile (MOB)' },
-    { value: 'Tablet', label: 'Tablet (TAB)' },
+    { value: 'Laptop', label: 'Laptop (LAP)' },
+    { value: 'Headset', label: 'Headset (HST)' },
+    { value: 'Keyboard', label: 'Keyboard (KBD)' },
+    { value: 'Mouse', label: 'Mouse (MSE)' },
+    { value: 'HDMI', label: 'HDMI (HDMI)' },
+    { value: 'Power Cable', label: 'Power Cable (PWR)' },
+    { value: 'Power Adapter', label: 'Power Adapter (ADP)' },
+    { value: 'Router', label: 'Router (RTR)' },
+    { value: 'Gigswitch', label: 'Gigswitch (GSWH)' },
+    { value: 'Webcam', label: 'Webcam (WEBC)' },
+    { value: 'CCTV', label: 'CCTV (CCTV)' },
+    { value: 'Chair', label: 'Chair (CHR)' },
     { value: 'Printer', label: 'Printer (PRN)' },
-    { value: 'Networking', label: 'Networking (NET)' },
-    { value: 'Storage', label: 'Storage (STR)' },
-    { value: 'Peripheral', label: 'Peripheral (PER)' },
-  ];
-
-  const employeeOptions = [
-    { value: '', label: 'None (Keep in Stock)' },
-    ...employees.map((e) => ({
-      value: e.id,
-      label: `${e.name} (${e.employee_id})`,
-    })),
   ];
 
   return (
@@ -139,78 +125,69 @@ export default function AddAssetPage() {
       />
 
       {error && (
-        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-sm text-rose-700 flex items-start gap-2.5">
-          <span className="font-bold text-rose-600">⚠️</span>
+        <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/60 rounded-xl text-sm text-rose-700 dark:text-rose-300 flex items-start gap-2.5">
+          <span className="font-bold text-rose-600 dark:text-rose-400">⚠️</span>
           <span>{error}</span>
         </div>
       )}
 
       <form onSubmit={handleSubmit}>
         <Card>
-          <div className="space-y-6">
-            {/* Section A: Asset Identity Information & Callout */}
+          <div className="space-y-8">
+            {/* Section A: Hardware Identification */}
             <FormSection
-              title="A. Asset Identity (System-Generated)"
-              description="System identity and barcode parameters are automatically determined by the backend."
+              title="A. Hardware Classification"
+              description="Select the hardware category. The permanent asset number prefix and barcode will be automatically determined."
             >
-              <div className="md:col-span-2 lg:col-span-3 p-4 bg-blue-50/60 border border-blue-200 rounded-xl space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 bg-white rounded-lg border border-blue-100 shadow-sm">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
-                      System Asset ID (Read-Only)
-                    </span>
-                    <span className="font-mono text-base font-bold text-blue-700 block mt-0.5">
-                      TGS-XXXXXX
-                    </span>
-                    <span className="text-[11px] text-slate-500">
-                      Permanent sequential primary identity auto-generated by MySQL.
-                    </span>
-                  </div>
+              <div className="md:col-span-2">
+                <Select
+                  label="Hardware Category"
+                  required
+                  options={categoryOptions}
+                  value={formData.category}
+                  onChange={(e) => handleChange('category', e.target.value)}
+                  helperText="Prefix will automatically map from category"
+                />
+              </div>
 
-                  <div className="p-3 bg-white rounded-lg border border-blue-100 shadow-sm">
-                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">
-                      Asset Number / Barcode Identity (Read-Only)
-                    </span>
-                    <span className="font-mono text-base font-bold text-purple-700 block mt-0.5">
-                      TGS-&lt;CAT&gt;-XXXXX
-                    </span>
-                    <span className="text-[11px] text-slate-500">
-                      Category-coded business number used to render Code 128 barcode stickers.
-                    </span>
-                  </div>
+              {/* Informational callout about asset ID and Barcode generation */}
+              <div className="md:col-span-2 lg:col-span-3 p-4 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 rounded-xl flex items-start gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded-lg shrink-0">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                  </svg>
                 </div>
-
-                <p className="text-[11px] text-slate-600 border-t border-blue-100 pt-2">
-                  ℹ️ <strong>Identity Distinction:</strong> Both <strong>Asset ID</strong> and <strong>Asset Number</strong> are server-generated and immutable. <strong>Hardware Serial Number</strong> is the physical manufacturer number you must enter manually from the device.
-                </p>
+                <div className="text-xs text-blue-900 dark:text-blue-200 space-y-1">
+                  <p className="font-semibold text-blue-950 dark:text-white">Automatic Asset Number & Code 128 Barcode</p>
+                  <p className="text-blue-800 dark:text-blue-300">
+                    The permanent asset tag (e.g., <code className="font-mono font-bold bg-blue-100 dark:bg-blue-900/60 px-1 py-0.5 rounded text-blue-900 dark:text-blue-200">TGS-{formData.category.slice(0, 4).toUpperCase()}-0001</code>) 
+                    and matching barcode are generated securely upon saving.
+                  </p>
+                </div>
               </div>
             </FormSection>
 
-            {/* Section B: Hardware Details */}
+            {/* Section B: Device Specifications */}
             <FormSection
-              title="B. Hardware Specification"
-              description="Basic categorization, manufacturer, model, and physical manufacturer serial number."
+              title="B. Device Specifications"
+              description="Physical device make, model, and manufacturer hardware serial number."
               borderTop
             >
-              <Select
-                label="Asset Category"
-                required
-                options={categoryOptions}
-                value={formData.category}
-                onChange={(e) => handleChange('category', e.target.value)}
-                helperText="Derives category barcode prefix (e.g. Laptop → LAP)"
-              />
-
               <Input
                 label="Brand / Manufacturer"
                 required
-                placeholder="e.g. Dell, Apple, Lenovo, HP"
+                placeholder="e.g. Dell, Apple, Lenovo, HP, Logitech"
                 value={formData.brand}
                 onChange={(e) => handleChange('brand', e.target.value)}
               />
 
               <Input
-                label="Model / Specification"
+                label="Model Name / Number"
                 required
                 placeholder="e.g. Latitude 5440, MacBook Pro 16 M3"
                 value={formData.model}
@@ -229,10 +206,10 @@ export default function AddAssetPage() {
               </div>
             </FormSection>
 
-            {/* Section C: Procurement & Financials */}
+            {/* Section C: Procurement, Warranty & Location */}
             <FormSection
-              title="C. Procurement & Financials"
-              description="Purchase details, vendor, acquisition cost, and procurement dates."
+              title="C. Procurement, Warranty & Location"
+              description="Purchase details, warranty expiration, and physical location of the hardware."
               borderTop
             >
               <DateInput
@@ -253,75 +230,100 @@ export default function AddAssetPage() {
                 onChange={(e) => handleChange('purchase_cost', e.target.value)}
               />
 
+              <DateInput
+                label="Warranty Expiry Date"
+                value={formData.warranty_expiry}
+                onChange={(e) => handleChange('warranty_expiry', e.target.value)}
+                helperText="Optional manufacturer warranty expiration date"
+              />
+
               <Input
-                label="Vendor / Supplier"
+                label="Location"
+                placeholder="e.g. The Space, 5th Floor, Server Room"
+                value={formData.location}
+                onChange={(e) => handleChange('location', e.target.value)}
+                helperText="Physical office or facility location"
+              />
+            </FormSection>
+
+            {/* Section D: Vendor Details */}
+            <FormSection
+              title="D. Vendor Details"
+              description="Supplier contact details including vendor name, phone number, and email ID."
+              borderTop
+            >
+              <Input
+                label="Vendor Name"
                 required
                 placeholder="e.g. CDW, Insight, Dell Direct, Apple"
                 value={formData.vendor}
                 onChange={(e) => handleChange('vendor', e.target.value)}
               />
-            </FormSection>
 
-            {/* Section D: Warranty Coverage */}
-            <FormSection
-              title="D. Warranty Coverage"
-              description="Manufacturer hardware warranty or extended service coverage period."
-              borderTop
-            >
-              <DateInput
-                label="Warranty Expiry Date"
-                value={formData.warranty_expiry}
-                onChange={(e) => handleChange('warranty_expiry', e.target.value)}
-                helperText="Optional manufacturer coverage expiration date"
+              <Input
+                label="Phone No"
+                type="tel"
+                placeholder="e.g. +1 (800) 555-0199"
+                value={formData.vendor_phone}
+                onChange={(e) => handleChange('vendor_phone', e.target.value)}
+                helperText="Vendor contact or support phone number"
+              />
+
+              <Input
+                label="Email ID"
+                type="email"
+                placeholder="e.g. support@vendor.com"
+                value={formData.vendor_email}
+                onChange={(e) => handleChange('vendor_email', e.target.value)}
+                helperText="Vendor support or sales representative email"
               />
             </FormSection>
 
-            {/* Section E: Initial Custody Assignment */}
+            {/* Section E: Registration Review */}
             <FormSection
-              title="E. Initial Custody Assignment"
-              description="Assign the hardware to an employee immediately or place directly into central stock."
-              borderTop
-            >
-              <div className="md:col-span-2">
-                <Select
-                  label="Assign Directly to Employee"
-                  options={employeeOptions}
-                  value={formData.current_employee_id}
-                  onChange={(e) => handleChange('current_employee_id', e.target.value)}
-                  helperText="If assigned, asset status is automatically set to 'assigned' and an initial custody event recorded in MySQL."
-                />
-              </div>
-            </FormSection>
-
-            {/* Section F: Registration Review Preview */}
-            <FormSection
-              title="F. Registration Review"
+              title="E. Registration Review"
               description="Verify key details before writing to MySQL database and generating barcodes."
               borderTop
             >
-              <div className="md:col-span-2 lg:col-span-3 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="md:col-span-2 lg:col-span-3 p-4 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-semibold">Category</span>
-                    <span className="font-bold text-slate-800">{formData.category || '-'}</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{formData.category || '-'}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-semibold">Make & Model</span>
-                    <span className="font-bold text-slate-800">
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
                       {formData.brand ? `${formData.brand} ${formData.model}` : '-'}
                     </span>
                   </div>
                   <div>
                     <span className="text-slate-400 block text-[10px] uppercase font-semibold">Serial Number</span>
-                    <span className="font-mono font-bold text-slate-900">{formData.serial_number || '-'}</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">{formData.serial_number || '-'}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Initial Custody</span>
-                    <span className="font-semibold text-slate-800">
-                      {formData.current_employee_id
-                        ? employees.find((e) => String(e.id) === String(formData.current_employee_id))?.name || 'Assigned'
-                        : 'Central Inventory (In Stock)'}
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Location</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{formData.location || 'The Space'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Vendor</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{formData.vendor || '-'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Vendor Contact</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {formData.vendor_phone || formData.vendor_email || '-'}
                     </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Purchase Cost</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      ${formData.purchase_cost || '0.00'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Stock Status</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">In Stock (Central)</span>
                   </div>
                 </div>
               </div>
@@ -329,7 +331,7 @@ export default function AddAssetPage() {
           </div>
 
           {/* Sticky Form Actions */}
-          <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm border-t border-slate-200 -mx-6 -mb-6 p-4 sm:px-6 rounded-b-xl flex items-center justify-end gap-3 z-10">
+          <div className="sticky bottom-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-t border-slate-200 dark:border-slate-800 -mx-6 -mb-6 p-4 sm:px-6 rounded-b-xl flex items-center justify-end gap-3 z-10">
             <Button variant="outline" type="button" onClick={() => router.push('/assets')} disabled={isSubmitting}>
               Cancel
             </Button>

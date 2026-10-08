@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: Authentication required.' }, { status: 401 });
     }
     if (!Permissions.canManageUsers(user)) {
-      return NextResponse.json({ error: 'Forbidden: Super Administrator privileges required.' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden: Administrator privileges required.' }, { status: 403 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: Authentication required.' }, { status: 401 });
     }
     if (!Permissions.canManageUsers(user)) {
-      return NextResponse.json({ error: 'Forbidden: Super Administrator privileges required.' }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden: Administrator privileges required.' }, { status: 403 });
     }
 
     let body: any;
@@ -45,6 +45,11 @@ export async function POST(req: NextRequest) {
     }
 
     const validated = createUserSchema.parse(body);
+
+    if (user.role === 'admin' && validated.role === 'super_admin') {
+      return NextResponse.json({ error: 'Only Super Administrators can create Super Administrator accounts.' }, { status: 403 });
+    }
+
     const created = await UserService.createUser({
       name: validated.name,
       email: validated.email,

@@ -34,7 +34,7 @@ export default function MyAssetsPage() {
       key: 'asset_number',
       header: 'Asset Number',
       render: (row) => (
-        <span className="font-mono font-bold text-slate-900 text-xs">
+        <span className="font-mono font-bold text-slate-900 dark:text-white text-xs">
           {row.asset_number}
         </span>
       ),
@@ -43,7 +43,7 @@ export default function MyAssetsPage() {
       key: 'category',
       header: 'Equipment Category',
       render: (row) => (
-        <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200">
+        <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
           {row.category}
         </span>
       ),
@@ -53,8 +53,8 @@ export default function MyAssetsPage() {
       header: 'Model & Specifications',
       render: (row) => (
         <div>
-          <span className="font-semibold text-slate-900 block text-xs">{row.brand} {row.model}</span>
-          <span className="text-[10px] text-slate-400 font-mono">Serial: {row.serial_number}</span>
+          <span className="font-semibold text-slate-900 dark:text-white block text-xs">{row.brand} {row.model}</span>
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">Serial: {row.serial_number}</span>
         </div>
       ),
     },
@@ -66,7 +66,7 @@ export default function MyAssetsPage() {
     {
       key: 'created_at',
       header: 'Assigned Date',
-      render: (row) => <span className="text-xs text-slate-500">{formatDate(row.created_at)}</span>,
+      render: (row) => <span className="text-xs text-slate-500 dark:text-slate-400">{formatDate(row.created_at)}</span>,
     },
     {
       key: 'actions',
@@ -77,7 +77,7 @@ export default function MyAssetsPage() {
           <Button
             variant="outline"
             size="sm"
-            className="text-xs border-rose-200 text-rose-700 hover:bg-rose-50 py-1 px-3"
+            className="text-xs border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 py-1 px-3"
             icon={
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />

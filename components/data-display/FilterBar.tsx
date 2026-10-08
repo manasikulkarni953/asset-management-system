@@ -10,7 +10,7 @@ export interface FilterItem {
   key: string;
   label?: string;
   value: string;
-  options: { value: string; label: string }[];
+  options: { value: string; label: string; group?: string }[];
   onChange: (value: string) => void;
   placeholder?: string;
 }
@@ -41,7 +41,7 @@ export function FilterBar({
   return (
     <div
       className={cn(
-        'flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-3 p-3 bg-white rounded-xl border border-slate-200 shadow-2xs',
+        'flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-between gap-3 p-3 bg-white dark:bg-[#0b1224] rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs',
         className
       )}
     >
@@ -53,7 +53,7 @@ export function FilterBar({
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={searchPlaceholder}
               leftIcon={
-                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -83,7 +83,7 @@ export function FilterBar({
             variant="ghost"
             size="sm"
             onClick={onReset}
-            className="text-slate-500 hover:text-slate-800 text-xs h-9"
+            className="text-slate-500 dark:text-slate-300 hover:text-slate-800 dark:hover:text-white text-xs h-9"
           >
             Clear Filters
           </Button>

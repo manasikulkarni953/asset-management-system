@@ -4,6 +4,7 @@ import { query, withTransaction } from '@/lib/db';
 import { generateNextTicketId } from '@/lib/asset-number';
 import { Ticket, TicketDetailed, TicketHistory } from '@/types/ticket';
 import { CreateTicketInput, UpdateTicketInput } from '@/validations/ticket.validation';
+import { NotificationService } from '@/services/notification.service';
 
 export interface TicketFilterOptions {
   search?: string;
@@ -71,7 +72,7 @@ export class TicketService {
       `SELECT COUNT(*) as total 
        FROM tickets t
        JOIN assets a ON t.asset_id = a.id
-       JOIN employees e ON t.employee_id = e.id
+       JOIN employee e ON t.employee_id = e.id
        WHERE ${whereClause}`,
       params
     );
@@ -89,8 +90,8 @@ export class TicketService {
         a.model as asset_model,
         a.serial_number as asset_serial_number,
         t.employee_id,
-        e.name as employee_name,
-        e.employee_id as employee_code,
+        COALESCE(e.name, e.full_name) as employee_name,
+        COALESCE(e.employee_id, CONCAT('TGS-', LPAD(e.id, 3, '0'))) as employee_code,
         t.raised_building,
         t.raised_floor,
         t.raised_workstation,
@@ -110,7 +111,7 @@ export class TicketService {
         t.updated_at
        FROM tickets t
        JOIN assets a ON t.asset_id = a.id
-       JOIN employees e ON t.employee_id = e.id
+       JOIN employee e ON t.employee_id = e.id
        LEFT JOIN users u ON (t.assigned_to = u.id OR (t.assigned_to IS NULL AND t.assigned_to_user_id = u.id))
        WHERE ${whereClause}
        ORDER BY t.id DESC
@@ -134,8 +135,8 @@ export class TicketService {
         a.model as asset_model,
         a.serial_number as asset_serial_number,
         t.employee_id,
-        e.name as employee_name,
-        e.employee_id as employee_code,
+        COALESCE(e.name, e.full_name) as employee_name,
+        COALESCE(e.employee_id, CONCAT('TGS-', LPAD(e.id, 3, '0'))) as employee_code,
         t.raised_building,
         t.raised_floor,
         t.raised_workstation,
@@ -155,7 +156,7 @@ export class TicketService {
         t.updated_at
        FROM tickets t
        JOIN assets a ON t.asset_id = a.id
-       JOIN employees e ON t.employee_id = e.id
+       JOIN employee e ON t.employee_id = e.id
        LEFT JOIN users u ON (t.assigned_to = u.id OR (t.assigned_to IS NULL AND t.assigned_to_user_id = u.id))
        WHERE t.id = ?
        LIMIT 1`,
@@ -197,7 +198,7 @@ export class TicketService {
       // If workstation not explicitly provided, look up the reporting employee's assigned workstation
       if (!workstation && data.employee_id) {
         const [empRows] = await conn.query<any>(
-          'SELECT workstation FROM employees WHERE id = ? LIMIT 1',
+          'SELECT workstation FROM employee WHERE id = ? LIMIT 1',
           [data.employee_id]
         );
         if (empRows && empRows[0]?.workstation) {
@@ -249,7 +250,35 @@ export class TicketService {
         'SELECT * FROM tickets WHERE id = ?',
         [dbId]
       );
-      return newTicket[0] as Ticket;
+      const createdTicket = newTicket[0] as Ticket;
+
+      // Broadcast notification to IT Admin and Super Admin
+      try {
+        const [empRows] = await conn.query<any[]>(
+          'SELECT name, full_name FROM employee WHERE id = ? LIMIT 1',
+          [data.employee_id]
+        );
+        const empName = empRows?.[0]?.name || empRows?.[0]?.full_name || 'Employee';
+
+        const [assetRows] = await conn.query<any[]>(
+          'SELECT asset_number, model FROM assets WHERE id = ? LIMIT 1',
+          [data.asset_id]
+        );
+        const assetNumber = assetRows?.[0]?.asset_number || `Asset #${data.asset_id}`;
+
+        await NotificationService.notifyTicketCreated({
+          ticketDbId: createdTicket.id,
+          ticketId: createdTicket.ticket_id,
+          employeeName: empName,
+          assetNumber,
+          issueCategory: data.issue_category,
+          priority: data.priority || 'medium',
+        });
+      } catch (notifErr) {
+        console.error('[TicketService] Non-blocking notification dispatch error:', notifErr);
+      }
+
+      return createdTicket;
     });
   }
 

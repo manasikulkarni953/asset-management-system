@@ -25,7 +25,7 @@ export function Pagination({
 
   if (totalItems <= pageSize && totalPages <= 1) {
     return (
-      <div className={cn('flex items-center justify-between text-xs text-slate-500 py-3', className)}>
+      <div className={cn('flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 py-3', className)}>
         <span>Showing {totalItems} entries</span>
       </div>
     );
@@ -50,14 +50,14 @@ export function Pagination({
   return (
     <div
       className={cn(
-        'flex flex-col sm:flex-row items-center justify-between gap-3 py-3 text-xs text-slate-600',
+        'flex flex-col sm:flex-row items-center justify-between gap-3 py-3 text-xs text-slate-600 dark:text-slate-300',
         className
       )}
     >
       <div>
-        Showing <span className="font-semibold text-slate-900">{startItem}</span> to{' '}
-        <span className="font-semibold text-slate-900">{endItem}</span> of{' '}
-        <span className="font-semibold text-slate-900">{totalItems}</span> entries
+        Showing <span className="font-semibold text-slate-900 dark:text-white">{startItem}</span> to{' '}
+        <span className="font-semibold text-slate-900 dark:text-white">{endItem}</span> of{' '}
+        <span className="font-semibold text-slate-900 dark:text-white">{totalItems}</span> entries
       </div>
 
       <div className="flex items-center gap-1.5">
@@ -75,7 +75,7 @@ export function Pagination({
           {pages.map((p, index) => {
             if (p === '...') {
               return (
-                <span key={`ellipsis-${index}`} className="px-2 py-1 text-slate-400">
+                <span key={`ellipsis-${index}`} className="px-2 py-1 text-slate-400 dark:text-slate-500">
                   ...
                 </span>
               );
@@ -90,7 +90,7 @@ export function Pagination({
                   'w-7 h-7 rounded-md text-xs font-medium transition-colors cursor-pointer',
                   isCurrent
                     ? 'bg-blue-600 text-white font-semibold shadow-xs'
-                    : 'text-slate-700 hover:bg-slate-100 border border-transparent'
+                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent'
                 )}
               >
                 {p}
