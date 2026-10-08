@@ -484,9 +484,14 @@ export class EmployeeService {
     ];
   }
 
-  static async getAllActiveEmployees(): Promise<Array<{ id: number; employee_id: string; name: string; department: string }>> {
+  static async getAllActiveEmployees(): Promise<Array<{ id: number; employee_id: string; name: string; department: string; designation?: string; email?: string }>> {
     return query(
-      `SELECT id, COALESCE(employee_id, CONCAT('TGS-', LPAD(id, 3, '0'))) as employee_id, COALESCE(name, full_name) as name, COALESCE(department, 'Operations') as department 
+      `SELECT id, 
+              COALESCE(employee_id, CONCAT('TGS-', LPAD(id, 3, '0'))) as employee_id, 
+              COALESCE(name, full_name) as name, 
+              email,
+              COALESCE(designation, job_title, 'Staff') as designation,
+              COALESCE(department, 'Operations') as department 
        FROM employee 
        WHERE status = 'active' OR is_active = 1 
        ORDER BY CAST(REGEXP_SUBSTR(COALESCE(employee_id, CONCAT('TGS-', LPAD(id, 3, '0'))), '[0-9]+') AS UNSIGNED) ASC`

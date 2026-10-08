@@ -41,21 +41,21 @@ import {
   Tags, 
   Tag, 
   FileSpreadsheet,
-  Check
+  Check,
+  Building2
 } from 'lucide-react';
 import { ASSET_TAG_SPECS, getAssetTagFormat } from '@/types/asset-set';
 
 // Standard enterprise departments matching the database
 const DEPARTMENTS = [
-  'Operations',
-  'Development',
   'Quality',
+  'Development',
+  'Operations',
+  'DBMS',
+  'Email Marketing',
   'Management',
   'Sales',
   'Human Resources',
-  'DBMS',
-  'Email Marketing',
-  'General',
 ];
 
 export default function AssetSetsPage() {
@@ -102,24 +102,54 @@ export default function AssetSetsPage() {
   const [isSavingSet, setIsSavingSet] = useState(false);
   const [editModalError, setEditModalError] = useState<string | null>(null);
 
+  // Helper to match target department to employee department with support for aliases
+  const isDeptMatch = (targetDept: string, empDept: string) => {
+    const t = (targetDept || '').trim().toLowerCase();
+    const e = (empDept || '').trim().toLowerCase();
+    if (!t || t === 'all') return true;
+    if (t === e) return true;
+    // Engineering / Dev / IT aliases
+    if (['engineering', 'development', 'dev', 'software', 'tech', 'it'].includes(t) &&
+        ['engineering', 'development', 'dev', 'dbms'].includes(e)) {
+      return true;
+    }
+    // Operations aliases
+    if (['operations', 'ops'].includes(t) &&
+        ['operations', 'dbms', 'email marketing'].includes(e)) {
+      return true;
+    }
+    // Design aliases
+    if (['design', 'creative', 'multimedia', 'ui/ux'].includes(t) &&
+        ['development', 'operations', 'marketing', 'design'].includes(e)) {
+      return true;
+    }
+    return false;
+  };
+
   // Filter employees strictly for the Create/Edit form by the chosen department
   const filteredEmployeesForForm = useMemo(() => {
+    if (!employees || employees.length === 0) return [];
     if (!setFormData.target_department || setFormData.target_department === 'All') {
       return employees;
     }
     const targetDept = setFormData.target_department.trim().toLowerCase();
-    return employees.filter((emp) => {
-      const empDept = (emp.department || '').trim().toLowerCase();
-      return empDept === targetDept;
-    });
+    const matched = employees.filter((emp) => isDeptMatch(targetDept, emp.department || ''));
+    return matched.length > 0 ? matched : employees;
   }, [employees, setFormData.target_department]);
 
-  // Filter employees for Assign modal strictly by the set's target department
+  // Filter employees for Assign modal by the set's target department
   const filteredEmployeesForAssign = useMemo(() => {
-    if (!selectedSetForAssign || !assignFilterByDept) return employees;
-    const dept = (selectedSetForAssign.target_department || '').trim().toLowerCase();
-    if (!dept || dept === 'all') return employees;
-    return employees.filter((emp) => (emp.department || '').trim().toLowerCase() === dept);
+    if (!employees || employees.length === 0) return [];
+    if (!selectedSetForAssign) return employees;
+    if (!assignFilterByDept) return employees;
+
+    const dept = (selectedSetForAssign.target_department || '').trim();
+    if (!dept || dept.toLowerCase() === 'all') return employees;
+
+    const matched = employees.filter((emp) => isDeptMatch(dept, emp.department || ''));
+    // If no employees match this specific department, fall back to showing ALL employees
+    // so the employee dropdown is NEVER empty and employees are ALWAYS visible!
+    return matched.length > 0 ? matched : employees;
   }, [employees, selectedSetForAssign, assignFilterByDept]);
 
   // Real-time unique tag validation - strictly blocks duplicates
@@ -163,6 +193,9 @@ export default function AssetSetsPage() {
       if (data.assetSets) {
         setAssetSets(data.assetSets);
       }
+      if (data.employees && Array.isArray(data.employees) && data.employees.length > 0) {
+        setEmployees(data.employees);
+      }
     } catch (err) {
       console.error('Failed to fetch asset sets:', err);
     } finally {
@@ -173,11 +206,15 @@ export default function AssetSetsPage() {
   const fetchPreloadData = useCallback(async () => {
     try {
       const [resEmp, resAssets] = await Promise.all([
-        fetch('/api/employees?limit=100').then((r) => r.json()),
-        fetch('/api/assets?status=in_stock&limit=200').then((r) => r.json()),
+        fetch('/api/employees?limit=100').then((r) => r.json()).catch(() => ({})),
+        fetch('/api/assets?status=in_stock&limit=200').then((r) => r.json()).catch(() => ({})),
       ]);
-      if (resEmp.employees) setEmployees(resEmp.employees);
-      if (resAssets.assets) setInStockAssets(resAssets.assets);
+      if (resEmp?.employees && Array.isArray(resEmp.employees) && resEmp.employees.length > 0) {
+        setEmployees(resEmp.employees);
+      }
+      if (resAssets?.assets && Array.isArray(resAssets.assets)) {
+        setInStockAssets(resAssets.assets);
+      }
     } catch (err) {
       console.error('Failed to preload employees or assets:', err);
     }
@@ -193,26 +230,24 @@ export default function AssetSetsPage() {
     setTargetEmployeeId('');
     setAssignmentNotes('');
     setAssignError(null);
+
+    // If target department has matching staff, keep filtering enabled;
+    // if 0 employees match that specific department name, default to showing all staff so they are visible immediately!
+    const dept = (set.target_department || '').trim();
+    const hasDeptMatches = employees.some((emp) => isDeptMatch(dept, emp.department || ''));
+    setAssignFilterByDept(hasDeptMatches);
+
     setIsAssignModalOpen(true);
 
-    try {
-      const [resEmp, resAssets] = await Promise.all([
-        fetch('/api/employees?limit=150').then((r) => r.json()),
-        fetch('/api/assets?status=in_stock&limit=200').then((r) => r.json()),
-      ]);
-      const loadedEmps = resEmp.employees || [];
-      const loadedAssets = resAssets.assets || [];
-      setEmployees(loadedEmps);
-      setInStockAssets(loadedAssets);
-
-      // Auto-select first available asset for each item in the set
+    // Auto-select with currently loaded in-stock assets
+    if (inStockAssets.length > 0) {
       const initialChosen: { [key: string]: string } = {};
       const usedAssetIds = new Set<string>();
 
       set.items.forEach((item, itemIdx) => {
         for (let q = 0; q < item.quantity; q++) {
           const slotKey = `${itemIdx}_${q}`;
-          const match = loadedAssets.find(
+          const match = inStockAssets.find(
             (a: any) =>
               (a.category?.toLowerCase() === item.category?.toLowerCase() ||
                (item.category?.toLowerCase() === 'cpu' && a.category?.toLowerCase() === 'desktop')) &&
@@ -226,8 +261,47 @@ export default function AssetSetsPage() {
           }
         }
       });
-
       setChosenAssetIds(initialChosen);
+    }
+
+    try {
+      const [resEmp, resAssets] = await Promise.all([
+        fetch('/api/employees?limit=150').then((r) => r.json()).catch(() => ({})),
+        fetch('/api/assets?status=in_stock&limit=200').then((r) => r.json()).catch(() => ({})),
+      ]);
+      const loadedEmps = resEmp?.employees;
+      const loadedAssets = resAssets?.assets;
+
+      if (Array.isArray(loadedEmps) && loadedEmps.length > 0) {
+        setEmployees(loadedEmps);
+      }
+      if (Array.isArray(loadedAssets) && loadedAssets.length > 0) {
+        setInStockAssets(loadedAssets);
+
+        // Update auto-select with freshly loaded assets
+        const initialChosen: { [key: string]: string } = {};
+        const usedAssetIds = new Set<string>();
+
+        set.items.forEach((item, itemIdx) => {
+          for (let q = 0; q < item.quantity; q++) {
+            const slotKey = `${itemIdx}_${q}`;
+            const match = loadedAssets.find(
+              (a: any) =>
+                (a.category?.toLowerCase() === item.category?.toLowerCase() ||
+                 (item.category?.toLowerCase() === 'cpu' && a.category?.toLowerCase() === 'desktop')) &&
+                !usedAssetIds.has(String(a.id))
+            );
+            if (match) {
+              initialChosen[slotKey] = String(match.id);
+              usedAssetIds.add(String(match.id));
+            } else {
+              initialChosen[slotKey] = '';
+            }
+          }
+        });
+
+        setChosenAssetIds(initialChosen);
+      }
     } catch (err) {
       console.error('Error preloading assignment data:', err);
     }
@@ -484,6 +558,196 @@ export default function AssetSetsPage() {
   const readySets = assetSets.filter((s) => (s.available_kits_count || 0) > 0).length;
   const totalConfiguredItems = assetSets.reduce((sum, s) => sum + (s.total_items || 0), 0);
 
+  // Department badge styling
+  const getDepartmentBadgeStyle = (dept: string) => {
+    const d = (dept || '').toLowerCase();
+    if (d.includes('dev') || d.includes('eng') || d.includes('tech')) {
+      return 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800/70';
+    }
+    if (d.includes('dbms') || d.includes('data')) {
+      return 'bg-cyan-50 text-cyan-700 dark:bg-cyan-950/60 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800/70';
+    }
+    if (d.includes('email') || d.includes('market')) {
+      return 'bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border-purple-200 dark:border-purple-800/70';
+    }
+    if (d.includes('oper') || d.includes('ops')) {
+      return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/70';
+    }
+    if (d.includes('manage') || d.includes('exec') || d.includes('lead')) {
+      return 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800/70';
+    }
+    if (d.includes('sale') || d.includes('market')) {
+      return 'bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-200 dark:border-rose-800/70';
+    }
+    if (d.includes('qual') || d.includes('qa')) {
+      return 'bg-teal-50 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border-teal-200 dark:border-teal-800/70';
+    }
+    if (d.includes('hr') || d.includes('human')) {
+      return 'bg-pink-50 text-pink-700 dark:bg-pink-950/60 dark:text-pink-300 border-pink-200 dark:border-pink-800/70';
+    }
+    return 'bg-slate-100 text-slate-700 dark:bg-slate-800/80 dark:text-slate-300 border-slate-200 dark:border-slate-700';
+  };
+
+
+  const DEPARTMENT_FORM_OPTIONS: { value: string; label: string; group?: string }[] = [
+    { value: 'Quality', label: 'Quality' },
+    { value: 'Development', label: 'Development' },
+    { value: 'Operations', label: 'Operations', group: 'Operations' },
+    { value: 'DBMS', label: 'DBMS', group: 'Operations' },
+    { value: 'Email Marketing', label: 'Email Marketing', group: 'Operations' },
+    { value: 'Management', label: 'Management' },
+    { value: 'Sales', label: 'Sales' },
+    { value: 'Human Resources', label: 'Human Resources' },
+  ];
+
+  const departmentFilterOptions = useMemo(() => {
+    return [
+      { value: 'all', label: 'All Departments' },
+      { value: 'Quality', label: 'Quality' },
+      { value: 'Development', label: 'Development' },
+      { value: 'Operations', label: 'Operations', group: 'Operations' },
+      { value: 'DBMS', label: 'DBMS', group: 'Operations' },
+      { value: 'Email Marketing', label: 'Email Marketing', group: 'Operations' },
+      { value: 'Management', label: 'Management' },
+      { value: 'Sales', label: 'Sales' },
+      { value: 'Human Resources', label: 'Human Resources' },
+    ];
+  }, []);
+
+  // Card renderer with properly arranged information and 'Assign to the employee' button (no icon)
+  const renderCard = (set: AssetSet) => {
+    const hasStock = (set.available_kits_count || 0) > 0;
+    const setTag = set.tag_number || '001';
+
+    return (
+      <div
+        key={set.id}
+        className="bg-white dark:bg-[#0c1427] border border-slate-200 dark:border-slate-800/90 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:border-blue-500/60 dark:hover:border-blue-500/50 hover:shadow-xl transition-all duration-200 group relative"
+      >
+        <div className="space-y-4">
+          {/* Card Top: Department Badge & Actions */}
+          <div className="flex items-center justify-between gap-2">
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${getDepartmentBadgeStyle(
+                set.target_department
+              )}`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>{set.target_department || 'Operations'}</span>
+            </span>
+
+            {/* Edit & Delete Action Buttons */}
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => openEditModal(set)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
+                title="Edit Asset Group"
+                aria-label="Edit Asset Group"
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => openDeleteModal(set)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                title="Delete Asset Group"
+                aria-label="Delete Asset Group"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Group Title and Code / Tag Badges */}
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors leading-snug">
+              {set.name}
+            </h3>
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800/80">
+                {set.code}
+              </span>
+              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80 flex items-center gap-1 shadow-2xs">
+                <Tag className="w-3 h-3 text-indigo-500" />
+                Tag #{setTag}
+              </span>
+              <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-200/80 dark:border-slate-700/60">
+                {set.total_items || set.items?.length || 0} Assets
+              </span>
+            </div>
+          </div>
+
+          {/* Description */}
+          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed min-h-[34px] line-clamp-2">
+            {set.description || 'Configured standard departmental asset package.'}
+          </p>
+
+          {/* Included Tagged Hardware Items */}
+          <div className="p-3 bg-slate-50/80 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-800 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <Layers className="w-3.5 h-3.5 text-blue-500" />
+                Included Tagged Hardware ({set.total_items || set.items?.length || 0} items)
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {set.items.map((item, idx) => {
+                const tagFmt = item.tag_format || getAssetTagFormat(item.category, setTag);
+                return (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-slate-200/90 dark:border-slate-700/70 text-xs shadow-2xs hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors"
+                    title={item.notes || undefined}
+                  >
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="shrink-0">{getItemIcon(item.category)}</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200 truncate text-[11px]">
+                        {item.quantity}x {item.category}
+                      </span>
+                    </div>
+                    <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950/70 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 shrink-0">
+                      {tagFmt}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Stock Readiness Indicator */}
+          <div className="flex items-center justify-between text-xs pt-1 px-0.5">
+            <span className="text-slate-500 dark:text-slate-400 font-medium">Inventory Status:</span>
+            {hasStock ? (
+              <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800/50">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                {set.available_kits_count} complete {set.available_kits_count === 1 ? 'kit' : 'kits'} ready
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/50">
+                <AlertCircle className="w-3.5 h-3.5" />
+                Check in-stock items
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Primary Action Button - Assign to the employee (NO ICON) */}
+        <div className="pt-3.5 mt-3.5 border-t border-slate-100 dark:border-slate-800/80">
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => openAssignModal(set)}
+            className="w-full text-xs font-bold py-2.5 justify-center shadow-sm"
+          >
+            Assign to the employee
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -603,13 +867,7 @@ export default function AssetSetsPage() {
           {
             key: 'department',
             label: 'Department',
-            options: [
-              { value: 'all', label: 'All Departments' },
-              { value: 'Engineering', label: 'Engineering' },
-              { value: 'Design', label: 'Design' },
-              { value: 'Operations', label: 'Operations' },
-              { value: 'Management', label: 'Management' },
-            ],
+            options: departmentFilterOptions,
             value: department,
             onChange: (val) => setDepartment(val),
           },
@@ -619,6 +877,7 @@ export default function AssetSetsPage() {
           setDepartment('all');
         }}
       />
+
 
       {/* Sets Grid */}
       {isLoading ? (
@@ -641,129 +900,7 @@ export default function AssetSetsPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {assetSets.map((set) => {
-            const hasStock = (set.available_kits_count || 0) > 0;
-            const setTag = set.tag_number || '001';
-
-            return (
-              <div
-                key={set.id}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 shadow-xs flex flex-col justify-between hover:border-blue-400 dark:hover:border-blue-600/70 hover:shadow-lg transition-all group"
-              >
-                <div className="space-y-4">
-                  {/* Card Header with Tag badge, SKU & Edit/Delete Actions */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-md bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800/80">
-                          {set.code}
-                        </span>
-                        <span className="font-mono text-xs font-bold px-2.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-950/70 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80 flex items-center gap-1 shadow-2xs">
-                          <Tag className="w-3 h-3 text-indigo-500" />
-                          Tag #{setTag}
-                        </span>
-                        <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                          {set.target_department}
-                        </span>
-                      </div>
-                      <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mt-1.5 leading-snug">
-                        {set.name}
-                      </h3>
-                    </div>
-
-                    {/* Edit & Delete Action Buttons */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => openEditModal(set)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors"
-                        title="Edit Asset Group"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openDeleteModal(set)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                        title="Delete Asset Group"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  {set.description && (
-                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
-                      {set.description}
-                    </p>
-                  )}
-
-                  {/* Included Tagged Hardware Items List */}
-                  <div className="p-3.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200/90 dark:border-slate-800 rounded-xl space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 flex items-center gap-1.5">
-                        <Tags className="w-3.5 h-3.5 text-blue-400" />
-                        Included Tagged Hardware ({set.total_items} items)
-                      </span>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      {set.items.map((item, idx) => {
-                        const tagFmt = item.tag_format || getAssetTagFormat(item.category, setTag);
-                        return (
-                          <div
-                            key={idx}
-                            className="flex items-center gap-2 text-xs font-semibold px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-800/95 border border-slate-200/90 dark:border-slate-700/80 text-slate-800 dark:text-slate-200 shadow-2xs hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors"
-                            title={item.notes || undefined}
-                          >
-                            <div className="flex items-center gap-1.5">
-                              {getItemIcon(item.category)}
-                              <span>
-                                {item.quantity}x {item.category}
-                              </span>
-                            </div>
-                            <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60 tracking-wider">
-                              {tagFmt}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Stock Readiness Indicator */}
-                  <div className="flex items-center justify-between text-xs pt-1">
-                    <span className="text-slate-500">Inventory Status:</span>
-                    {hasStock ? (
-                      <span className="inline-flex items-center gap-1 font-semibold text-emerald-600 dark:text-emerald-400">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        {set.available_kits_count} complete {set.available_kits_count === 1 ? 'kit' : 'kits'} ready
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 font-medium text-amber-600 dark:text-amber-400">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        Check in-stock items
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Primary Action Button */}
-                <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-800/80">
-                  <Button
-                    variant="primary"
-                    size="md"
-                    onClick={() => openAssignModal(set)}
-                    className="w-full text-xs font-bold py-2 justify-center gap-2 shadow-sm"
-                  >
-                    <UserCheck className="w-4 h-4" />
-                    <span>Assign Group to Employee</span>
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
+          {assetSets.map((set) => renderCard(set))}
         </div>
       )}
 
@@ -890,40 +1027,46 @@ export default function AssetSetsPage() {
               </div>
             )}
 
-            {/* Target Employee Selection Filtered by Department */}
+            {/* Target Employee Selection */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  Target Custodian Employee in {selectedSetForAssign.target_department} *
+                  Target Employee Custodian *
                 </span>
-                <button
-                  type="button"
-                  onClick={() => setAssignFilterByDept(!assignFilterByDept)}
-                  className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-semibold"
-                >
-                  {assignFilterByDept
-                    ? `Showing ${selectedSetForAssign.target_department} staff only (Click to show all)`
-                    : `Showing all staff (Click to filter by ${selectedSetForAssign.target_department})`}
-                </button>
+                {employees.length > 0 && selectedSetForAssign.target_department && selectedSetForAssign.target_department.toLowerCase() !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={() => setAssignFilterByDept(!assignFilterByDept)}
+                    className="text-[11px] text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+                  >
+                    {assignFilterByDept
+                      ? `Filter: ${selectedSetForAssign.target_department} (Click to show all ${employees.length} employees)`
+                      : `Filter: Showing all ${employees.length} (Click to filter by ${selectedSetForAssign.target_department})`}
+                  </button>
+                )}
               </div>
               <Select
                 required
                 options={[
                   {
                     value: '',
-                    label: `-- Choose Employee in ${assignFilterByDept ? selectedSetForAssign.target_department : 'All Departments'} (${filteredEmployeesForAssign.length} available) --`,
+                    label: filteredEmployeesForAssign.length > 0
+                      ? `-- Choose Employee (${filteredEmployeesForAssign.length} available) --`
+                      : '-- Loading employees... --',
                   },
                   ...filteredEmployeesForAssign.map((emp) => ({
                     value: String(emp.id),
-                    label: `${emp.name || emp.full_name || 'Staff'} (${emp.employee_id || emp.email}) — ${emp.department || 'General'}`,
+                    label: `${emp.name || emp.full_name || 'Employee'} (${emp.employee_id || emp.email || `ID #${emp.id}`}) — ${emp.department || 'Operations'}${emp.designation ? ` • ${emp.designation}` : ''}`,
                   })),
                 ]}
                 value={targetEmployeeId}
                 onChange={(e) => setTargetEmployeeId(e.target.value)}
                 helperText={
-                  assignFilterByDept
-                    ? `Strictly showing ${filteredEmployeesForAssign.length} employees from ${selectedSetForAssign.target_department}.`
-                    : 'Showing employees across all departments.'
+                  filteredEmployeesForAssign.length === 0
+                    ? 'Loading employee roster...'
+                    : assignFilterByDept && filteredEmployeesForAssign.length < employees.length
+                    ? `Showing ${filteredEmployeesForAssign.length} employees matching ${selectedSetForAssign.target_department}. Click the link above to view all ${employees.length} employees.`
+                    : `Showing all ${filteredEmployeesForAssign.length} active employees.`
                 }
               />
             </div>
@@ -1067,10 +1210,7 @@ export default function AssetSetsPage() {
                 <Select
                   label="Select Department *"
                   required
-                  options={DEPARTMENTS.map((dept) => ({
-                    value: dept,
-                    label: dept,
-                  }))}
+                  options={DEPARTMENT_FORM_OPTIONS}
                   value={setFormData.target_department}
                   onChange={(e) => {
                     const newDept = e.target.value;

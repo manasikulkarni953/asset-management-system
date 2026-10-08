@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AssetSetService } from '@/services/asset-set.service';
+import { EmployeeService } from '@/services/employee.service';
 import { getAuthUserFromRequest } from '@/lib/auth';
 import { Permissions } from '@/lib/permissions';
 
@@ -14,11 +15,15 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get('search') || undefined;
     const department = searchParams.get('department') || undefined;
 
-    const sets = await AssetSetService.getAssetSets(search, department);
+    const [sets, employees] = await Promise.all([
+      AssetSetService.getAssetSets(search, department),
+      EmployeeService.getAllActiveEmployees(),
+    ]);
 
     return NextResponse.json({
       success: true,
       assetSets: sets,
+      employees,
       total: sets.length,
     });
   } catch (error: any) {

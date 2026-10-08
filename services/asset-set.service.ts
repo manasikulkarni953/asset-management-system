@@ -14,8 +14,12 @@ export class AssetSetService {
     }
 
     if (department && department !== 'all') {
-      conditions.push('s.target_department = ?');
-      params.push(department);
+      if (department.toLowerCase() === 'operations') {
+        conditions.push("(s.target_department = 'Operations' OR s.target_department = 'DBMS' OR s.target_department = 'Email Marketing')");
+      } else {
+        conditions.push('s.target_department = ?');
+        params.push(department);
+      }
     }
 
     const whereClause = conditions.join(' AND ');
