@@ -53,6 +53,8 @@ export class AssetService {
     if (importId) {
       conditions.push('a.import_id = ?');
       params.push(importId);
+    } else {
+      conditions.push('a.import_id IS NULL');
     }
 
     const whereClause = conditions.join(' AND ');
@@ -497,136 +499,34 @@ export class AssetService {
       throw new Error('No asset rows provided in the file to import.');
     }
 
-    // 1. Create initial asset_imports record
+    // 1. Create asset_imports record with completed status and full spreadsheet content
+    // Kept separate from the main assets inventory table so uploaded files only appear in View File
     const insertImportRes = await execute(
       `INSERT INTO asset_imports (
         filename, original_name, file_size, file_content, total_records, 
         success_count, failed_count, status, imported_by_user_id, imported_by_name
-      ) VALUES (?, ?, ?, ?, ?, 0, 0, 'processing', ?, ?)`,
-      [filename, originalName, fileSize, fileContent || null, rows.length, userId || null, userName || null]
+      ) VALUES (?, ?, ?, ?, ?, ?, 0, 'completed', ?, ?)`,
+      [
+        filename,
+        originalName,
+        fileSize,
+        fileContent || null,
+        rows.length,
+        rows.length,
+        userId || null,
+        userName || null,
+      ]
     );
 
     const importId = (insertImportRes as any).insertId;
-    const importedAssets: Asset[] = [];
-    const errors: Array<{ row: number; serial?: string; error: string }> = [];
-
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    // 2. Process each row
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const rowNum = i + 1;
-
-      // Flexible column resolver
-      const getVal = (possibleKeys: string[]): string => {
-        for (const k of possibleKeys) {
-          if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
-            return String(row[k]).trim();
-          }
-          // Case-insensitive match check
-          const foundKey = Object.keys(row).find((rk) => rk.toLowerCase().replace(/[\s_-]/g, '') === k.toLowerCase().replace(/[\s_-]/g, ''));
-          if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && String(row[foundKey]).trim() !== '') {
-            return String(row[foundKey]).trim();
-          }
-        }
-        return '';
-      };
-
-      const category = getVal(['category', 'asset_type', 'type']) || 'CPU';
-      const brand = getVal(['brand', 'manufacturer', 'make']) || 'Standard';
-      const model = getVal(['model', 'model_number', 'device']) || 'Standard Hardware';
-      const serialNumber = getVal([
-        'serial_number',
-        'serialno',
-        'serial',
-        'sn',
-        'serial_no',
-        'hardware_serial',
-        'serialnumber',
-        'servicetag',
-        'service_tag',
-        'asset_tag',
-        'assettag',
-        'asset_number',
-        'assetnumber',
-        'tag',
-        'code',
-        'device_id',
-        'imei',
-      ]);
-      const effectiveSerial =
-        serialNumber ||
-        `SN-${category.slice(0, 3).toUpperCase()}-${Date.now().toString(36).toUpperCase()}-${Math.floor(
-          1000 + Math.random() * 9000
-        )}`;
-
-      const purchaseDate = getVal(['purchase_date', 'purchase', 'date', 'acq_date']) || todayStr;
-      const rawCost = getVal(['purchase_cost', 'cost', 'price', 'amount']);
-      const purchaseCost = parseFloat(rawCost.replace(/[^0-9.]/g, '')) || 0;
-      const vendor = getVal(['vendor', 'supplier', 'seller']) || 'Direct Supplier';
-      const vendorPhone = getVal(['vendor_phone', 'phone', 'contact_number']) || null;
-      const vendorEmail = getVal(['vendor_email', 'email', 'supplier_email']) || null;
-      const location = getVal(['location', 'site', 'room', 'floor', 'office']) || 'The Space';
-      const warrantyExpiry = getVal(['warranty_expiry', 'warranty', 'warranty_date']) || null;
-      const statusRaw = getVal(['status', 'asset_status']).toLowerCase();
-
-      let status: 'in_stock' | 'assigned' | 'under_maintenance' | 'retired' = 'in_stock';
-      if (['assigned', 'in_use', 'active'].includes(statusRaw)) status = 'assigned';
-      else if (['maintenance', 'under_maintenance', 'repair'].includes(statusRaw)) status = 'under_maintenance';
-      else if (['retired', 'disposed'].includes(statusRaw)) status = 'retired';
-
-      try {
-        const created = await this.createAsset(
-          {
-            category,
-            brand,
-            model,
-            serial_number: effectiveSerial,
-            purchase_date: purchaseDate,
-            purchase_cost: purchaseCost,
-            vendor,
-            vendor_phone: vendorPhone,
-            vendor_email: vendorEmail,
-            location,
-            warranty_expiry: warrantyExpiry,
-            status,
-          },
-          userId,
-          importId
-        );
-        importedAssets.push(created);
-      } catch (err: any) {
-        errors.push({
-          row: rowNum,
-          serial: effectiveSerial,
-          error: err?.message || 'Failed to create asset record.',
-        });
-      }
-    }
-
-    const successCount = importedAssets.length;
-    const failedCount = errors.length;
-    const finalStatus = failedCount === 0 ? 'completed' : (successCount > 0 ? 'partial' : 'failed');
-
-    // 3. Update asset_imports record
-    await execute(
-      `UPDATE asset_imports 
-       SET total_records = ?, 
-           success_count = ?, 
-           failed_count = ?, 
-           status = ?, 
-           error_log = ? 
-       WHERE id = ?`,
-      [rows.length, successCount, failedCount, finalStatus, errors.length > 0 ? JSON.stringify(errors) : null, importId]
-    );
 
     return {
       importId,
       totalRecords: rows.length,
-      successCount,
-      failedCount,
-      errors,
-      importedAssets,
+      successCount: rows.length,
+      failedCount: 0,
+      errors: [],
+      importedAssets: [],
     };
   }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { AssetImport, Asset } from '@/types/asset';
 import { formatDate } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
@@ -53,6 +54,11 @@ export function ImportedFileFullScreenViewer({
   const [searchTerm, setSearchTerm] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Pagination for large files
   const [pageSize, setPageSize] = useState<number>(50);
@@ -299,13 +305,13 @@ export function ImportedFileFullScreenViewer({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !isMounted) return null;
 
   const fileName = importRecord?.original_name || importRecord?.filename || 'Imported File';
 
-  return (
+  return createPortal(
     <div
-      className={`fixed inset-0 z-[100] flex flex-col bg-slate-950/90 backdrop-blur-md transition-all duration-300 animate-in fade-in ${
+      className={`fixed inset-0 z-[9999] flex flex-col bg-slate-950/90 backdrop-blur-md transition-all duration-300 animate-in fade-in ${
         isFullscreen ? 'p-0' : 'p-3 sm:p-6'
       }`}
       role="dialog"
@@ -403,24 +409,24 @@ export function ImportedFileFullScreenViewer({
                 )}
               </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveView('assets')}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
-                  activeView === 'assets'
-                    ? 'bg-blue-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-                }`}
-                title="View assets created from this file in inventory"
-              >
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>Created Assets</span>
-                {assets.length > 0 && (
+              {assets.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveView('assets')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                    activeView === 'assets'
+                      ? 'bg-blue-600 text-white shadow-md'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  }`}
+                  title="View assets created from this file in inventory"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>Created Assets</span>
                   <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] bg-emerald-900/60 text-emerald-300">
                     {assets.length}
                   </span>
-                )}
-              </button>
+                </button>
+              )}
 
               {errorLogList.length > 0 && (
                 <button
@@ -542,7 +548,7 @@ export function ImportedFileFullScreenViewer({
                 </select>
               </div>
 
-              {onFilterByImport && importRecord && (
+              {onFilterByImport && importRecord && assets.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1016,6 +1022,7 @@ export function ImportedFileFullScreenViewer({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -860,20 +860,6 @@ export function AssetImportModal({
                                 View File
                               </Button>
                             )}
-                            {onFilterByImport && f.importId > 0 && (
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={() => {
-                                  onFilterByImport(f.importId, f.fileName);
-                                  onClose();
-                                }}
-                                icon={<ArrowRight className="w-3 h-3" />}
-                                className="text-xs py-1 px-2.5"
-                              >
-                                View in Table
-                              </Button>
-                            )}
                           </div>
                         </div>
                       ))}
@@ -1007,20 +993,6 @@ export function AssetImportModal({
                       >
                         Download
                       </Button>
-                      {onFilterByImport && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            onFilterByImport(item.id, item.original_name || item.filename);
-                            onClose();
-                          }}
-                          icon={<Eye className="w-3 h-3" />}
-                          title="Filter asset table by this file"
-                        >
-                          Assets
-                        </Button>
-                      )}
                       <Button
                         variant="danger"
                         size="sm"
