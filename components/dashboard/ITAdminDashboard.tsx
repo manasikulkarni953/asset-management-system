@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Package,
@@ -14,12 +14,9 @@ import {
   CheckCircle2,
   AlertCircle,
   ArrowUp,
-  Zap,
   Plus,
   FileText,
-  Database,
   Calendar,
-  UserCheck,
   ArrowRight,
   RefreshCw,
 } from 'lucide-react';
@@ -87,7 +84,7 @@ export function ITAdminDashboard() {
     }
   };
 
-  const fetchDashboardData = () => {
+  const fetchDashboardData = useCallback(() => {
     setIsLoading(true);
     fetch('/api/reports?type=dashboard')
       .then((res) => (res.ok ? res.json() : null))
@@ -104,7 +101,7 @@ export function ITAdminDashboard() {
         setLastUpdated(usTimeStr);
         setCurrentDateStr(usDateStr);
       });
-  };
+  }, []);
 
   useEffect(() => {
     const { greeting: usGreeting, usTimeStr, usDateStr } = getUSShiftDetails();
@@ -112,7 +109,7 @@ export function ITAdminDashboard() {
     setLastUpdated(usTimeStr);
     setCurrentDateStr(usDateStr);
     fetchDashboardData();
-  }, []);
+  }, [fetchDashboardData]);
 
   // Safe metrics calculations with realistic fallbacks
   const totalAssets = metrics?.totalAssets || 128;

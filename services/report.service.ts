@@ -20,7 +20,6 @@ export interface DashboardMetrics {
     high: number;
   };
   expiringWarranty: number;
-  expiringInsurance: number;
   recentActivity: Array<{
     id: number;
     asset_number: string;
@@ -57,13 +56,6 @@ export interface DashboardMetrics {
     asset_number: string;
     model: string;
     warranty_expiry: string;
-  }>;
-  insuranceAlerts: Array<{
-    id: number;
-    asset_number: string;
-    provider: string;
-    policy_number: string;
-    expiry_date: string;
   }>;
 }
 
@@ -110,13 +102,6 @@ export class ReportService {
       WHERE warranty_expiry IS NOT NULL 
         AND warranty_expiry <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)
         AND warranty_expiry >= CURDATE()
-    `);
-
-    const [insuranceCount] = await query<any>(`
-      SELECT COUNT(*) as total 
-      FROM asset_insurance 
-      WHERE expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-        AND expiry_date >= CURDATE()
     `);
 
     const recentActivity = await query<any>(`
@@ -183,16 +168,6 @@ export class ReportService {
       LIMIT 5
     `);
 
-    const insuranceAlerts = await query<any>(`
-      SELECT ai.id, a.asset_number, ai.provider, ai.policy_number, ai.expiry_date
-      FROM asset_insurance ai
-      JOIN assets a ON ai.asset_id = a.id
-      WHERE ai.expiry_date <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-        AND ai.expiry_date >= CURDATE()
-      ORDER BY ai.expiry_date ASC
-      LIMIT 5
-    `);
-
     return {
       totalAssets: Number(assetCounts?.total || 0),
       assignedAssets: Number(assetCounts?.assigned || 0),
@@ -213,13 +188,11 @@ export class ReportService {
         high: Number(ticketBreakdownRow?.high_count || 0),
       },
       expiringWarranty: Number(warrantyCount?.total || 0),
-      expiringInsurance: Number(insuranceCount?.total || 0),
       recentActivity,
       recentTickets,
       recentAssets,
       categoryDistribution,
       warrantyAlerts,
-      insuranceAlerts,
     };
   }
 

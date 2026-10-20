@@ -15,7 +15,6 @@ const PROTECTED_ROUTES = [
   '/scan',
   '/tickets',
   '/insurance',
-  '/network',
   '/reports',
 ];
 
@@ -103,8 +102,8 @@ export async function proxy(request: NextRequest) {
       }
     }
 
-    // 2. Admin & Super Admin only routes: /assignments, /reports, /insurance, /network
-    const adminOnlyRoutes = ['/assignments', '/reports', '/insurance', '/network'];
+    // 2. Admin & Super Admin only routes: /assignments, /reports, /insurance
+    const adminOnlyRoutes = ['/assignments', '/reports', '/insurance'];
     const isAdminOnlyRoute = adminOnlyRoutes.some(
       (route) => pathname === route || pathname.startsWith(`${route}/`)
     );

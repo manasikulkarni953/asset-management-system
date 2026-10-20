@@ -282,7 +282,7 @@ export default function EmployeeDetailsPage({
       list.push(employee.department);
     }
     return list.map((dept) => ({ value: dept, label: dept }));
-  }, [employee?.department]);
+  }, [employee]);
 
   const openEditModal = () => {
     if (!employee) return;

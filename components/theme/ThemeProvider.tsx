@@ -14,6 +14,22 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 const THEME_STORAGE_KEY = 'app-theme';
 
+function applyThemeClass(newTheme: Theme) {
+  if (typeof document === 'undefined') return;
+  const root = document.documentElement;
+  if (newTheme === 'dark') {
+    root.classList.add('dark');
+    root.classList.remove('light');
+    root.style.colorScheme = 'dark';
+    root.setAttribute('data-theme', 'dark');
+  } else {
+    root.classList.remove('dark');
+    root.classList.add('light');
+    root.style.colorScheme = 'light';
+    root.setAttribute('data-theme', 'light');
+  }
+}
+
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('dark');
   const [, startTransition] = useTransition();
@@ -37,21 +53,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       applyThemeClass('dark');
     }
   }, []);
-
-  const applyThemeClass = (newTheme: Theme) => {
-    const root = document.documentElement;
-    if (newTheme === 'dark') {
-      root.classList.add('dark');
-      root.classList.remove('light');
-      root.style.colorScheme = 'dark';
-      root.setAttribute('data-theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      root.classList.add('light');
-      root.style.colorScheme = 'light';
-      root.setAttribute('data-theme', 'light');
-    }
-  };
 
   const setTheme = (newTheme: Theme) => {
     startTransition(() => {

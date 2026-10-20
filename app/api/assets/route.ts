@@ -18,6 +18,9 @@ export async function GET(req: NextRequest) {
     const rawEmployeeId = searchParams.get('employeeId');
     let employeeId = rawEmployeeId && !isNaN(Number(rawEmployeeId)) ? Number(rawEmployeeId) : undefined;
 
+    const rawImportId = searchParams.get('importId');
+    const importId = rawImportId && !isNaN(Number(rawImportId)) ? Number(rawImportId) : undefined;
+
     // Role-based data isolation: employees can only view assets currently assigned to them
     if (user.role === 'employee') {
       const { EmployeeService } = await import('@/services/employee.service');
@@ -43,6 +46,7 @@ export async function GET(req: NextRequest) {
       category,
       status,
       employeeId,
+      importId,
       page,
       limit,
     });

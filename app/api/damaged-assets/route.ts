@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DamageService } from '@/services/damage.service';
 import { getAuthUserFromRequest } from '@/lib/auth';
-import { Permissions } from '@/lib/permissions';
 
 export async function GET(req: NextRequest) {
   try {

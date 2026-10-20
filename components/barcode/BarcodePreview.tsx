@@ -37,15 +37,26 @@ export function BarcodePreview({
       </div>
 
       {/* Barcode Graphic with isolated high-contrast quiet zone */}
-      <div className="w-full flex justify-center py-2 bg-white rounded-lg overflow-x-auto">
+      <div className="w-full flex flex-col items-center justify-center py-2 bg-white rounded-lg overflow-x-auto">
         <BarcodeGenerator
           value={assetNumber}
-          width={2.5} // Large module width for maximum camera and cross-screen decodability
-          height={95} // Taller bars ensure horizontal scanlines intersect reliably
-          displayValue={true}
-          fontSize={15}
+          width={2.2}
+          height={85}
+          displayValue={false}
           renderMode="svg"
+          className="p-0 bg-transparent shadow-none"
         />
+        <div
+          className="font-mono font-black text-black tracking-[0.22em] text-center select-all mt-2 uppercase"
+          style={{
+            fontSize: '13pt',
+            fontWeight: 800,
+            letterSpacing: '0.22em',
+            marginRight: '-0.22em',
+          }}
+        >
+          {assetNumber}
+        </div>
       </div>
 
       {/* Asset Metadata footer */}

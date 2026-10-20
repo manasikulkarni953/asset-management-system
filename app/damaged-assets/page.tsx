@@ -21,14 +21,9 @@ import {
   AlertTriangle, 
   Wrench, 
   CheckCircle2, 
-  XCircle, 
   DollarSign, 
-  ShieldAlert, 
-  FileText, 
   ArrowUpRight,
-  Layers,
-  Clock,
-  Sparkles
+  Clock
 } from 'lucide-react';
 
 export default function DamagedAssetsPage() {

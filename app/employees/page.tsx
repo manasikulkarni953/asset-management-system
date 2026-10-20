@@ -16,7 +16,6 @@ import { Employee } from '@/types/employee';
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [total, setTotal] = useState(0);
-  const [departments, setDepartments] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Filters
@@ -89,7 +88,6 @@ export default function EmployeesPage() {
       if (data.employees) {
         setEmployees(data.employees);
         setTotal(data.total);
-        if (data.departments) setDepartments(data.departments);
       }
     } catch (err) {
       console.error('Error fetching employees:', err);

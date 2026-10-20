@@ -89,12 +89,6 @@ export const Permissions = {
     return user.role === 'super_admin' || user.role === 'admin';
   },
 
-  // Network: SUPER_ADMIN FULL, ADMIN YES, EMPLOYEE NO
-  canManageNetwork: (user: AuthUser | null): boolean => {
-    if (!user) return false;
-    return user.role === 'super_admin' || user.role === 'admin';
-  },
-
   // User Management: SUPER_ADMIN YES, ADMIN YES, EMPLOYEE NO
   canManageUsers: (user: AuthUser | null): boolean => {
     if (!user) return false;

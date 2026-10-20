@@ -34,27 +34,6 @@ export const insuranceSchema = z.object({
   path: ['expiry_date'],
 });
 
-export const networkSchema = z.object({
-  asset_id: z.coerce.number().min(1, 'Asset is required'),
-  assignment_type: z.enum(['DHCP', 'Static']).default('Static'),
-  ip_address: z.string().trim().min(1, 'IP address is required').regex(
-    /^(\d{1,3}\.){3}\d{1,3}$/,
-    'Invalid IPv4 address format (e.g. 192.168.1.50)'
-  ),
-  subnet_mask: z.string().trim().nullable().optional().or(z.literal('')),
-  default_gateway: z.string().trim().nullable().optional().or(z.literal('')),
-  dns_server: z.string().trim().nullable().optional().or(z.literal('')),
-  mac_address: z.string().trim().min(1, 'MAC address is required').regex(
-    /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/,
-    'Invalid MAC address format (e.g. A4:83:E7:22:9C:5F)'
-  ),
-  hostname: z.string().trim().min(1, 'Hostname is required'),
-  network_name: z.string().trim().nullable().optional().or(z.literal('')),
-  vlan: z.string().trim().nullable().optional().or(z.literal('')),
-  notes: z.string().trim().nullable().optional().or(z.literal('')),
-});
-
 export type CreateAssetInput = z.infer<typeof createAssetSchema>;
 export type UpdateAssetInput = z.infer<typeof updateAssetSchema>;
 export type InsuranceInput = z.infer<typeof insuranceSchema>;
-export type NetworkInput = z.infer<typeof networkSchema>;

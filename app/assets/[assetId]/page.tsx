@@ -24,7 +24,7 @@ export default function AssetDetailsPage({
   const [isLoading, setIsLoading] = useState(true);
   const [isPrintOpen, setIsPrintOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'assignments' | 'tickets' | 'history' | 'insurance' | 'network'
+    'overview' | 'assignments' | 'tickets' | 'history' | 'insurance'
   >('overview');
 
   useEffect(() => {
@@ -120,7 +120,6 @@ export default function AssetDetailsPage({
           { key: 'tickets', label: 'Support Tickets', count: asset.tickets?.length },
           { key: 'history', label: 'Audit History', count: asset.history?.length },
           { key: 'insurance', label: 'Insurance' },
-          { key: 'network', label: 'Network' },
         ].map((tab) => {
           const isActive = activeTab === tab.key;
           return (
@@ -506,79 +505,6 @@ export default function AssetDetailsPage({
               <p>No insurance policy mapped to this asset.</p>
               <Link href="/insurance" className="inline-block mt-2 text-blue-600 hover:underline font-medium">
                 + Add Insurance Policy
-              </Link>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* Tab: Network */}
-      {activeTab === 'network' && (
-        <Card
-          title="Network Configuration"
-          subtitle={`Network interface details for ${asset.asset_number}`}
-          headerAction={
-            <Link href="/network" className="text-xs text-blue-600 hover:underline">
-              Manage Network →
-            </Link>
-          }
-        >
-          {asset.network ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
-                <div>
-                  <span className="text-slate-500 block">IP Address</span>
-                  <span className="font-mono font-bold text-slate-900 text-sm mt-0.5 block">{asset.network.ip_address || '-'}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">IP Assignment</span>
-                  <span className="font-semibold text-slate-800 mt-0.5 block">
-                    {asset.network.assignment_type || 'Static'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">MAC Address</span>
-                  <span className="font-mono font-semibold text-slate-800 text-sm mt-0.5 block">{asset.network.mac_address || '-'}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Hostname</span>
-                  <span className="font-mono text-slate-700 mt-0.5 block">{asset.network.hostname || '-'}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Network Name</span>
-                  <span className="font-medium text-slate-700 mt-0.5 block">{asset.network.network_name || '-'}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">VLAN</span>
-                  <span className="font-bold text-blue-600 font-mono mt-0.5 block">{asset.network.vlan || '-'}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Subnet Mask</span>
-                  <span className="font-mono text-slate-700 mt-0.5 block">{asset.network.subnet_mask || '255.255.255.0'}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">Default Gateway</span>
-                  <span className="font-mono text-slate-700 mt-0.5 block">{asset.network.gateway || '-'}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block">DNS Server</span>
-                  <span className="font-mono text-slate-700 mt-0.5 block">{asset.network.dns_server || '-'}</span>
-                </div>
-              </div>
-              {asset.network.notes && (
-                <div className="pt-3 border-t border-slate-100 text-xs">
-                  <span className="text-slate-500 font-semibold block mb-1">Notes:</span>
-                  <p className="text-slate-700 bg-slate-50 p-2.5 rounded-lg border border-slate-100 whitespace-pre-wrap">
-                    {asset.network.notes}
-                  </p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="py-8 text-center text-xs text-slate-400">
-              <p>No network interface configured for this asset.</p>
-              <Link href="/network" className="inline-block mt-2 text-blue-600 hover:underline font-medium">
-                + Configure Network Interface
               </Link>
             </div>
           )}

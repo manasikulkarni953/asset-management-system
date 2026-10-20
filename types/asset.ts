@@ -19,8 +19,26 @@ export interface Asset {
   current_employee_id: number | null;
   current_employee_name?: string | null;
   current_employee_code?: string | null;
+  import_id?: number | null;
+  import_filename?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AssetImport {
+  id: number;
+  filename: string;
+  original_name: string;
+  file_size: number;
+  file_content?: string | null;
+  total_records: number;
+  success_count: number;
+  failed_count: number;
+  status: 'completed' | 'failed' | 'partial';
+  imported_by_user_id: number | null;
+  imported_by_name: string | null;
+  error_log?: string | null;
+  created_at: string;
 }
 
 export type AssetHistoryEventType =
@@ -72,36 +90,8 @@ export interface AssetInsurance {
   updated_at: string;
 }
 
-export interface AssetNetwork {
-  id: number;
-  asset_id: number;
-  asset_number?: string;
-  asset_name?: string;
-  asset_model?: string;
-  brand?: string;
-  model?: string;
-  serial_number?: string;
-  ip_address: string | null;
-  assignment_type: 'DHCP' | 'Static';
-  subnet_mask?: string | null;
-  gateway?: string | null;
-  dns_server?: string | null;
-  mac_address: string | null;
-  hostname: string | null;
-  network_name: string | null;
-  vlan: string | null;
-  notes?: string | null;
-  employee_id?: string | null;
-  employee_name?: string | null;
-  department?: string | null;
-  workstation?: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface AssetDetailed extends Asset {
   insurance?: AssetInsurance | null;
-  network?: AssetNetwork | null;
   history?: AssetHistory[];
   assignments?: any[];
   tickets?: any[];

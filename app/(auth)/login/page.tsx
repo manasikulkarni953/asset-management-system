@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 
 export default function LoginPage() {
@@ -67,9 +68,12 @@ export default function LoginPage() {
             <div className="w-full flex-1 flex flex-col items-center justify-center py-4">
               {/* Taraj Global Official Logo */}
               <div className="mb-5 flex items-center justify-center">
-                <img
+                <Image
                   src="/taraj-global-logo.png"
                   alt="Taraj Global - Business Simplified"
+                  width={280}
+                  height={112}
+                  priority
                   className="h-24 sm:h-28 w-auto max-w-[280px] object-contain drop-shadow-md transition-transform duration-300 hover:scale-105"
                 />
               </div>

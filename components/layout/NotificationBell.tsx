@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Bell, CheckCheck, ExternalLink, Ticket, Clock, Check } from 'lucide-react';
+import { Bell, CheckCheck, ExternalLink, Ticket, Clock } from 'lucide-react';
 
 interface NotificationItem {
   id: number;

@@ -8,13 +8,14 @@ export interface AssetFilterOptions {
   category?: string;
   status?: string;
   employeeId?: number;
+  importId?: number;
   page?: number;
   limit?: number;
 }
 
 export class AssetService {
   static async getAssets(options: AssetFilterOptions = {}): Promise<{ assets: Asset[]; total: number }> {
-    const { search, category, status, employeeId, page = 1, limit = 20 } = options;
+    const { search, category, status, employeeId, importId, page = 1, limit = 20 } = options;
     const offset = (page - 1) * limit;
 
     const conditions: string[] = ['1=1'];
@@ -49,6 +50,11 @@ export class AssetService {
       params.push(employeeId);
     }
 
+    if (importId) {
+      conditions.push('a.import_id = ?');
+      params.push(importId);
+    }
+
     const whereClause = conditions.join(' AND ');
 
     const countRows = await query<any>(
@@ -80,10 +86,13 @@ export class AssetService {
         a.current_employee_id,
         COALESCE(e.name, e.full_name) as current_employee_name,
         COALESCE(e.employee_id, CONCAT('TGS-', LPAD(e.id, 3, '0'))) as current_employee_code,
+        a.import_id,
+        ai.original_name as import_filename,
         a.created_at,
         a.updated_at
        FROM assets a
        LEFT JOIN employee e ON a.current_employee_id = e.id
+       LEFT JOIN asset_imports ai ON a.import_id = ai.id
        WHERE ${whereClause}
        ORDER BY a.id DESC
        LIMIT ? OFFSET ?`,
@@ -132,13 +141,6 @@ export class AssetService {
       [id]
     );
     asset.insurance = insuranceRows[0] || null;
-
-    // Fetch network
-    const networkRows = await query<any>(
-      `SELECT * FROM asset_network WHERE asset_id = ? LIMIT 1`,
-      [id]
-    );
-    asset.network = networkRows[0] || null;
 
     // Fetch history
     asset.history = await this.getAssetHistory(id);
@@ -219,7 +221,7 @@ export class AssetService {
     return this.getAssetById(rows[0].id);
   }
 
-  static async createAsset(data: CreateAssetInput, userId?: number): Promise<Asset> {
+  static async createAsset(data: CreateAssetInput, userId?: number, importId?: number): Promise<Asset> {
     return withTransaction(async (conn) => {
       // 1. Hardware serial number validation and uniqueness check
       const trimmedSerial = (data.serial_number || '').trim();
@@ -267,8 +269,8 @@ export class AssetService {
         `INSERT INTO assets (
           asset_id, asset_number, category, brand, model, serial_number, 
           purchase_date, purchase_cost, vendor, vendor_phone, vendor_email, location,
-          warranty_expiry, status, current_employee_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          warranty_expiry, status, current_employee_id, import_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           assetId,
           assetNumber,
@@ -285,16 +287,20 @@ export class AssetService {
           data.warranty_expiry || null,
           initialStatus,
           data.current_employee_id || null,
+          importId || null,
         ]
       );
 
       const internalId = (res as any).insertId;
 
       // 5. Record creation in history (references assets.id)
+      const desc = importId
+        ? `Asset imported via file with ID ${assetId} and number ${assetNumber}`
+        : `Asset registered with ID ${assetId} and number ${assetNumber}`;
       await conn.execute(
         `INSERT INTO asset_history (asset_id, event_type, description, performed_by_user_id)
          VALUES (?, 'created', ?, ?)`,
-        [internalId, `Asset registered with ID ${assetId} and number ${assetNumber}`, userId || null]
+        [internalId, desc, userId || null]
       );
 
       // 6. If assigned initially, create assignment record and history
@@ -457,6 +463,246 @@ export class AssetService {
     ];
     const existing = rows.map((r) => r.category);
     return Array.from(new Set([...defaults, ...existing]));
+  }
+
+  /**
+   * Import batch of assets from parsed file data (CSV / Excel).
+   * Creates an asset_imports audit record and individual asset records with full identities.
+   */
+  static async importAssetsFromData({
+    filename,
+    originalName,
+    fileSize,
+    fileContent,
+    rows,
+    userId,
+    userName,
+  }: {
+    filename: string;
+    originalName: string;
+    fileSize: number;
+    fileContent?: string;
+    rows: any[];
+    userId?: number;
+    userName?: string;
+  }): Promise<{
+    importId: number;
+    totalRecords: number;
+    successCount: number;
+    failedCount: number;
+    errors: Array<{ row: number; serial?: string; error: string }>;
+    importedAssets: Asset[];
+  }> {
+    if (!rows || rows.length === 0) {
+      throw new Error('No asset rows provided in the file to import.');
+    }
+
+    // 1. Create initial asset_imports record
+    const insertImportRes = await execute(
+      `INSERT INTO asset_imports (
+        filename, original_name, file_size, file_content, total_records, 
+        success_count, failed_count, status, imported_by_user_id, imported_by_name
+      ) VALUES (?, ?, ?, ?, ?, 0, 0, 'processing', ?, ?)`,
+      [filename, originalName, fileSize, fileContent || null, rows.length, userId || null, userName || null]
+    );
+
+    const importId = (insertImportRes as any).insertId;
+    const importedAssets: Asset[] = [];
+    const errors: Array<{ row: number; serial?: string; error: string }> = [];
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // 2. Process each row
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const rowNum = i + 1;
+
+      // Flexible column resolver
+      const getVal = (possibleKeys: string[]): string => {
+        for (const k of possibleKeys) {
+          if (row[k] !== undefined && row[k] !== null && String(row[k]).trim() !== '') {
+            return String(row[k]).trim();
+          }
+          // Case-insensitive match check
+          const foundKey = Object.keys(row).find((rk) => rk.toLowerCase().replace(/[\s_-]/g, '') === k.toLowerCase().replace(/[\s_-]/g, ''));
+          if (foundKey && row[foundKey] !== undefined && row[foundKey] !== null && String(row[foundKey]).trim() !== '') {
+            return String(row[foundKey]).trim();
+          }
+        }
+        return '';
+      };
+
+      const category = getVal(['category', 'asset_type', 'type']) || 'CPU';
+      const brand = getVal(['brand', 'manufacturer', 'make']) || 'Standard';
+      const model = getVal(['model', 'model_number', 'device']) || 'Standard Hardware';
+      const serialNumber = getVal([
+        'serial_number',
+        'serialno',
+        'serial',
+        'sn',
+        'serial_no',
+        'hardware_serial',
+        'serialnumber',
+        'servicetag',
+        'service_tag',
+        'asset_tag',
+        'assettag',
+        'asset_number',
+        'assetnumber',
+        'tag',
+        'code',
+        'device_id',
+        'imei',
+      ]);
+      const effectiveSerial =
+        serialNumber ||
+        `SN-${category.slice(0, 3).toUpperCase()}-${Date.now().toString(36).toUpperCase()}-${Math.floor(
+          1000 + Math.random() * 9000
+        )}`;
+
+      const purchaseDate = getVal(['purchase_date', 'purchase', 'date', 'acq_date']) || todayStr;
+      const rawCost = getVal(['purchase_cost', 'cost', 'price', 'amount']);
+      const purchaseCost = parseFloat(rawCost.replace(/[^0-9.]/g, '')) || 0;
+      const vendor = getVal(['vendor', 'supplier', 'seller']) || 'Direct Supplier';
+      const vendorPhone = getVal(['vendor_phone', 'phone', 'contact_number']) || null;
+      const vendorEmail = getVal(['vendor_email', 'email', 'supplier_email']) || null;
+      const location = getVal(['location', 'site', 'room', 'floor', 'office']) || 'The Space';
+      const warrantyExpiry = getVal(['warranty_expiry', 'warranty', 'warranty_date']) || null;
+      const statusRaw = getVal(['status', 'asset_status']).toLowerCase();
+
+      let status: 'in_stock' | 'assigned' | 'under_maintenance' | 'retired' = 'in_stock';
+      if (['assigned', 'in_use', 'active'].includes(statusRaw)) status = 'assigned';
+      else if (['maintenance', 'under_maintenance', 'repair'].includes(statusRaw)) status = 'under_maintenance';
+      else if (['retired', 'disposed'].includes(statusRaw)) status = 'retired';
+
+      try {
+        const created = await this.createAsset(
+          {
+            category,
+            brand,
+            model,
+            serial_number: effectiveSerial,
+            purchase_date: purchaseDate,
+            purchase_cost: purchaseCost,
+            vendor,
+            vendor_phone: vendorPhone,
+            vendor_email: vendorEmail,
+            location,
+            warranty_expiry: warrantyExpiry,
+            status,
+          },
+          userId,
+          importId
+        );
+        importedAssets.push(created);
+      } catch (err: any) {
+        errors.push({
+          row: rowNum,
+          serial: effectiveSerial,
+          error: err?.message || 'Failed to create asset record.',
+        });
+      }
+    }
+
+    const successCount = importedAssets.length;
+    const failedCount = errors.length;
+    const finalStatus = failedCount === 0 ? 'completed' : (successCount > 0 ? 'partial' : 'failed');
+
+    // 3. Update asset_imports record
+    await execute(
+      `UPDATE asset_imports 
+       SET total_records = ?, 
+           success_count = ?, 
+           failed_count = ?, 
+           status = ?, 
+           error_log = ? 
+       WHERE id = ?`,
+      [rows.length, successCount, failedCount, finalStatus, errors.length > 0 ? JSON.stringify(errors) : null, importId]
+    );
+
+    return {
+      importId,
+      totalRecords: rows.length,
+      successCount,
+      failedCount,
+      errors,
+      importedAssets,
+    };
+  }
+
+  static async getImportHistory(): Promise<any[]> {
+    return query(
+      `SELECT 
+        id,
+        filename,
+        original_name,
+        file_size,
+        total_records,
+        success_count,
+        failed_count,
+        status,
+        imported_by_user_id,
+        imported_by_name,
+        error_log,
+        created_at
+       FROM asset_imports
+       ORDER BY id DESC`
+    );
+  }
+
+  static async getImportById(id: number): Promise<any | null> {
+    const rows = await query<any>(
+      `SELECT * FROM asset_imports WHERE id = ? LIMIT 1`,
+      [id]
+    );
+    return rows && rows.length > 0 ? rows[0] : null;
+  }
+
+  static async deleteImportBatch(
+    importId: number,
+    deleteAssets: boolean = true
+  ): Promise<{ success: boolean; deletedAssetsCount: number; message: string }> {
+    return withTransaction(async (conn) => {
+      const [importRows]: any = await conn.execute(
+        'SELECT id, filename, original_name FROM asset_imports WHERE id = ?',
+        [importId]
+      );
+      if (!importRows || importRows.length === 0) {
+        throw new Error('Import batch record not found');
+      }
+
+      const [assetRows]: any = await conn.execute(
+        'SELECT id FROM assets WHERE import_id = ?',
+        [importId]
+      );
+      const assetIds: number[] = (assetRows || []).map((r: any) => r.id);
+
+      let deletedAssetsCount = 0;
+
+      if (deleteAssets && assetIds.length > 0) {
+        for (const assetId of assetIds) {
+          await conn.execute('DELETE FROM asset_network WHERE asset_id = ?', [assetId]);
+          await conn.execute('DELETE FROM asset_insurance WHERE asset_id = ?', [assetId]);
+          await conn.execute('UPDATE tickets SET asset_id = NULL WHERE asset_id = ?', [assetId]);
+          await conn.execute('DELETE FROM asset_assignments WHERE asset_id = ?', [assetId]);
+          await conn.execute('DELETE FROM asset_history WHERE asset_id = ?', [assetId]);
+          await conn.execute('DELETE FROM assets WHERE id = ?', [assetId]);
+        }
+        deletedAssetsCount = assetIds.length;
+      } else if (!deleteAssets && assetIds.length > 0) {
+        await conn.execute('UPDATE assets SET import_id = NULL WHERE import_id = ?', [importId]);
+      }
+
+      await conn.execute('DELETE FROM asset_imports WHERE id = ?', [importId]);
+
+      return {
+        success: true,
+        deletedAssetsCount,
+        message: deleteAssets
+          ? `Imported file and ${deletedAssetsCount} associated asset(s) deleted successfully.`
+          : 'Imported file record deleted successfully.',
+      };
+    });
   }
 }
 

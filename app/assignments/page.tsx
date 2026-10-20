@@ -64,7 +64,6 @@ export default function AssignmentsPage() {
   // Multi-Asset Assignment Form State
   const [assignEmployeeId, setAssignEmployeeId] = useState('');
   const [selectedAssetIds, setSelectedAssetIds] = useState<number[]>([]);
-  const [assignNotes, setAssignNotes] = useState('');
   const [assignCondition, setAssignCondition] = useState('Good');
   const [assetSearchQuery, setAssetSearchQuery] = useState('');
   const [assetCategoryFilter, setAssetCategoryFilter] = useState('all');
@@ -162,7 +161,6 @@ export default function AssignmentsPage() {
   const openAssignModal = async () => {
     setAssignEmployeeId('');
     setSelectedAssetIds([]);
-    setAssignNotes('');
     setAssignCondition('Good');
     setAssetSearchQuery('');
     setAssetCategoryFilter('all');
@@ -293,7 +291,6 @@ export default function AssignmentsPage() {
       // Reset
       setSelectedAssetIds([]);
       setAssignEmployeeId('');
-      setAssignNotes('');
       fetchAssignments();
     } catch (err: any) {
       setModalError(err.message || 'Assignment failed');

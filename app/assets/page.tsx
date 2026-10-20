@@ -10,8 +10,11 @@ import { StatusBadge } from '@/components/data-display/StatusBadge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { BarcodePrint } from '@/components/barcode/BarcodePrint';
+import { AssetImportModal } from '@/components/assets/AssetImportModal';
+import { ImportedFileFullScreenViewer } from '@/components/assets/ImportedFileFullScreenViewer';
 import { Asset } from '@/types/asset';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { Upload, FolderOpen, FileSpreadsheet, Trash2, Maximize2 } from 'lucide-react';
 
 export default function AssetsPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -26,6 +29,13 @@ export default function AssetsPage() {
   const [page, setPage] = useState(1);
   const pageSize = 15;
 
+  // Import modal & filter states
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importModalTab, setImportModalTab] = useState<'import' | 'history'>('import');
+  const [importFilter, setImportFilter] = useState<{ id: number; name: string } | null>(null);
+  const [importHistoryCount, setImportHistoryCount] = useState<number>(0);
+  const [fullScreenImportId, setFullScreenImportId] = useState<number | null>(null);
+
   // Print modal state
   const [selectedAssetForPrint, setSelectedAssetForPrint] = useState<Asset | null>(null);
 
@@ -34,6 +44,21 @@ export default function AssetsPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Fetch count of imported files
+  const fetchImportCount = useCallback(async () => {
+    try {
+      const res = await fetch('/api/assets/imports');
+      const data = await res.json();
+      if (data.imports) setImportHistoryCount(data.imports.length);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchImportCount();
+  }, [fetchImportCount]);
+
   const fetchAssets = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -41,6 +66,7 @@ export default function AssetsPage() {
       if (search.trim()) params.set('search', search.trim());
       if (category !== 'all') params.set('category', category);
       if (status !== 'all') params.set('status', status);
+      if (importFilter?.id) params.set('importId', String(importFilter.id));
       params.set('page', String(page));
       params.set('limit', String(pageSize));
 
@@ -56,7 +82,7 @@ export default function AssetsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [search, category, status, page]);
+  }, [search, category, status, importFilter, page]);
 
   useEffect(() => {
     fetchAssets();
@@ -66,6 +92,7 @@ export default function AssetsPage() {
     setSearch('');
     setCategory('all');
     setStatus('all');
+    setImportFilter(null);
     setPage(1);
   };
 
@@ -104,12 +131,44 @@ export default function AssetsPage() {
             {row.asset_number}
           </Link>
           <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono">ID: {row.asset_id}</span>
+          {row.import_filename && (
+            <div className="flex items-center gap-1 mt-0.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (row.import_id) {
+                    setImportFilter({ id: row.import_id, name: row.import_filename! });
+                    setPage(1);
+                  }
+                }}
+                className="inline-flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline font-medium cursor-pointer text-left truncate max-w-[150px]"
+                title={`Imported from ${row.import_filename}. Click to filter by this file.`}
+              >
+                📁 {row.import_filename}
+              </button>
+              {row.import_id && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setFullScreenImportId(row.import_id!);
+                  }}
+                  className="p-0.5 rounded text-slate-400 hover:text-blue-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                  title="View this imported file in full screen"
+                  aria-label="View imported file in full screen"
+                >
+                  <Maximize2 className="w-2.5 h-2.5" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       ),
     },
     {
       key: 'model',
-      header: 'Hardware Details',
+      header: 'Name',
       render: (row) => (
         <div>
           <div className="font-semibold text-slate-900 dark:text-white">
@@ -234,7 +293,30 @@ export default function AssetsPage() {
         title="Asset Inventory"
         description="Comprehensive inventory of organization hardware, Code 128 barcodes, and custodians."
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setImportModalTab('history');
+                setIsImportModalOpen(true);
+              }}
+              icon={<FolderOpen className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />}
+              title="View all imported files and their contents"
+            >
+              View Imported Files {importHistoryCount > 0 ? `(${importHistoryCount})` : ''}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setImportModalTab('import');
+                setIsImportModalOpen(true);
+              }}
+              icon={<Upload className="w-4 h-4 text-blue-600 dark:text-blue-400" />}
+            >
+              Import Files
+            </Button>
             <Link href="/scan">
               <Button
                 variant="outline"
@@ -304,6 +386,55 @@ export default function AssetsPage() {
         ]}
         onReset={handleResetFilters}
       />
+
+      {/* Filtered By Import Banner */}
+      {importFilter && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-xs text-blue-900 dark:text-blue-200 animate-fadeIn">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold flex items-center gap-1.5">
+              <FileSpreadsheet className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              Viewing Assets From File:
+            </span>
+            <span className="font-mono bg-blue-100 dark:bg-blue-900/60 px-2 py-0.5 rounded font-bold">
+              {importFilter.name}
+            </span>
+            <span className="text-blue-600 dark:text-blue-400 font-medium">({total} matching records)</span>
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setFullScreenImportId(importFilter.id)}
+              className="text-xs text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-white font-semibold cursor-pointer flex items-center gap-1 hover:underline"
+              title="Open this file in full screen"
+            >
+              <Maximize2 className="w-3.5 h-3.5" />
+              View File in Full Screen
+            </button>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => {
+                setImportFilter(null);
+                setPage(1);
+              }}
+              className="text-xs text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-white font-semibold underline cursor-pointer"
+            >
+              Clear Filter (Show All Assets)
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setImportModalTab('history');
+                setIsImportModalOpen(true);
+              }}
+              className="text-xs text-rose-600 dark:text-rose-400 hover:text-rose-800 dark:hover:text-rose-300 font-semibold cursor-pointer flex items-center gap-1 hover:underline"
+            >
+              <Trash2 className="w-3 h-3" />
+              Manage / Delete File
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Assets Table */}
       <DataTable
@@ -393,6 +524,37 @@ export default function AssetsPage() {
           </div>
         )}
       </Modal>
+
+      {/* Asset Import Modal (Upload & History) */}
+      <AssetImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        initialTab={importModalTab}
+        currentImportFilterId={importFilter?.id}
+        onClearImportFilter={() => {
+          setImportFilter(null);
+          setPage(1);
+        }}
+        onImportSuccess={() => {
+          fetchAssets();
+          fetchImportCount();
+        }}
+        onFilterByImport={(id, name) => {
+          setImportFilter({ id, name });
+          setPage(1);
+        }}
+      />
+
+      {/* Standalone Full Screen Imported File Viewer */}
+      <ImportedFileFullScreenViewer
+        isOpen={!!fullScreenImportId}
+        onClose={() => setFullScreenImportId(null)}
+        importId={fullScreenImportId}
+        onFilterByImport={(id, name) => {
+          setImportFilter({ id, name });
+          setPage(1);
+        }}
+      />
     </div>
   );
 }

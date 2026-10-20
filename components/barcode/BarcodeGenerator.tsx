@@ -11,6 +11,8 @@ export interface BarcodeGeneratorProps {
   height?: number;
   displayValue?: boolean;
   fontSize?: number;
+  margin?: number;
+  textMargin?: number;
   className?: string;
   renderMode?: 'canvas' | 'svg';
 }
@@ -21,6 +23,8 @@ export function BarcodeGenerator({
   height = DEFAULT_BARCODE_OPTIONS.height,
   displayValue = true,
   fontSize = DEFAULT_BARCODE_OPTIONS.fontSize,
+  margin,
+  textMargin,
   className,
   renderMode = 'canvas',
 }: BarcodeGeneratorProps) {
@@ -32,14 +36,14 @@ export function BarcodeGenerator({
 
     const barcodeConfig: JsBarcode.BaseOptions = {
       format: 'CODE128',
-      width: Math.round(width || 2), // Must be exact integer to eliminate subpixel blurring
+      width: width || 2,
       height: Math.round(height || 90),
       displayValue,
       fontSize: fontSize || 15,
       font: 'monospace',
       fontOptions: 'bold',
-      textMargin: 8,
-      margin: Math.max(20, DEFAULT_BARCODE_OPTIONS.margin ?? 24),
+      textMargin: textMargin !== undefined ? textMargin : 4,
+      margin: margin !== undefined ? margin : Math.max(10, DEFAULT_BARCODE_OPTIONS.margin ?? 24),
       background: '#ffffff',
       lineColor: '#000000',
     };
@@ -68,7 +72,7 @@ export function BarcodeGenerator({
         console.error('Barcode SVG render error:', err);
       }
     }
-  }, [value, width, height, displayValue, fontSize, renderMode]);
+  }, [value, width, height, displayValue, fontSize, renderMode, margin, textMargin]);
 
   if (!value) {
     return (
