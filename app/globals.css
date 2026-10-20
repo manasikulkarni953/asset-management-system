@@ -153,17 +153,62 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   background: #334155;
 }
 
-/* Thermal Sticker 50x25 Screen & Dark Mode Protection */
+/* Thermal Sticker 50x25 Screen & Dark Mode Protection - Complete Pure-White Isolation */
 .thermal-sticker-50x25,
+.thermal-sticker-50x25 *,
 html.dark .thermal-sticker-50x25,
-html.dark :is(.thermal-sticker-50x25) {
-  background-color: #ffffff !important;
-  color: #000000 !important;
+html.dark .thermal-sticker-50x25 *,
+html.dark :is(.thermal-sticker-50x25),
+html.dark :is(.thermal-sticker-50x25) * {
+  border-color: #000000 !important;
 }
 
-.thermal-sticker-50x25 *,
-html.dark .thermal-sticker-50x25 * {
-  color: #000000;
+.thermal-sticker-50x25,
+.thermal-sticker-50x25 div,
+.thermal-sticker-50x25 canvas,
+.thermal-sticker-50x25 svg,
+html.dark .thermal-sticker-50x25,
+html.dark .thermal-sticker-50x25 div,
+html.dark .thermal-sticker-50x25 canvas,
+html.dark .thermal-sticker-50x25 svg,
+html.dark :is(.thermal-sticker-50x25),
+html.dark :is(.thermal-sticker-50x25) div,
+html.dark :is(.thermal-sticker-50x25) canvas,
+html.dark :is(.thermal-sticker-50x25) svg {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  box-shadow: none !important;
+}
+
+.thermal-sticker-50x25 canvas,
+html.dark .thermal-sticker-50x25 canvas {
+  image-rendering: pixelated !important;
+  image-rendering: -moz-crisp-edges !important;
+  image-rendering: crisp-edges !important;
+  background-color: #ffffff !important;
+}
+
+.thermal-sticker-50x25 svg,
+html.dark .thermal-sticker-50x25 svg {
+  background: #ffffff !important;
+  shape-rendering: crispEdges !important;
+  image-rendering: pixelated !important;
+}
+
+.thermal-sticker-50x25 svg g,
+.thermal-sticker-50x25 svg rect,
+html.dark .thermal-sticker-50x25 svg g,
+html.dark .thermal-sticker-50x25 svg rect {
+  fill: #000000 !important;
+}
+
+.thermal-sticker-50x25 svg rect:first-child,
+.thermal-sticker-50x25 svg rect[fill="#ffffff"],
+.thermal-sticker-50x25 svg rect[fill="white"],
+html.dark .thermal-sticker-50x25 svg rect:first-child,
+html.dark .thermal-sticker-50x25 svg rect[fill="#ffffff"],
+html.dark .thermal-sticker-50x25 svg rect[fill="white"] {
+  fill: #ffffff !important;
 }
 
 .thermal-sticker-50x25 span.bg-black,
@@ -172,86 +217,123 @@ html.dark .thermal-sticker-50x25 span.bg-black {
   color: #ffffff !important;
 }
 
-/* Print styling for barcode stickers - 50mm x 25mm Thermal Label Printer (SRS58D / P58D) */
-.print-area {
-  position: absolute;
-  left: -9999px;
-  top: -9999px;
-  width: 0;
-  height: 0;
-  overflow: hidden;
+/* Print styling for barcode stickers - 55mm x 25mm Thermal Label Printer */
+#sticker-print-container {
+  display: none;
 }
 
 @page {
-  size: 50mm 25mm;
+  size: 55mm 25mm;
   margin: 0mm !important;
 }
 
 @media print {
+  *, *::before, *::after {
+    box-shadow: none !important;
+  }
+
   html,
-  body {
-    width: 50mm !important;
-    height: 25mm !important;
+  html.dark,
+  body,
+  html.dark body,
+  body.is-printing-sticker,
+  html.dark body.is-printing-sticker {
+    width: 100% !important;
+    height: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
 
-  body * {
+  /* When printing stickers: hide everything else so the background table NEVER leaks or adds pages */
+  body.is-printing-sticker > *:not(#sticker-print-container) {
+    display: none !important;
     visibility: hidden !important;
   }
 
-  .print-area,
-  .print-area * {
+  body.is-printing-sticker #sticker-print-container {
+    display: block !important;
     visibility: visible !important;
-  }
-
-  .print-area {
-    position: fixed !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 50mm !important;
-    height: 25mm !important;
-    margin: 0 !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 auto !important;
     padding: 0 !important;
-    background: transparent !important;
-    border: none !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
     z-index: 99999 !important;
-    overflow: visible !important;
   }
 
-  .print-sticker-item {
-    width: 50mm !important;
+  body.is-printing-sticker .sticker-print-page {
+    width: 100% !important;
     height: 25mm !important;
-    max-width: 50mm !important;
     max-height: 25mm !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     padding: 0 !important;
     page-break-after: always !important;
-    page-break-inside: avoid !important;
     break-after: page !important;
+    page-break-inside: avoid !important;
     break-inside: avoid !important;
     box-sizing: border-box !important;
-    display: block !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
     overflow: hidden !important;
   }
 
-  .thermal-sticker-50x25 {
-    width: 50mm !important;
+  body.is-printing-sticker .sticker-print-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+
+  body.is-printing-sticker .thermal-sticker-50x25,
+  body.is-printing-sticker .thermal-sticker-55x25 {
+    width: 55mm !important;
     height: 25mm !important;
-    min-width: 50mm !important;
+    min-width: 55mm !important;
     min-height: 25mm !important;
-    max-width: 50mm !important;
+    max-width: 55mm !important;
     max-height: 25mm !important;
     box-sizing: border-box !important;
     margin: 0 !important;
-    border: none !important;
     box-shadow: none !important;
     background: #ffffff !important;
     color: #000000 !important;
+    border: 1px solid #000000 !important;
+    border-radius: 1.5mm !important;
     overflow: hidden !important;
+  }
+
+  body.is-printing-sticker .thermal-sticker-50x25 canvas {
+    image-rendering: pixelated !important;
+    image-rendering: -moz-crisp-edges !important;
+    image-rendering: crisp-edges !important;
+    background-color: #ffffff !important;
+  }
+
+  body.is-printing-sticker .thermal-sticker-50x25 svg {
+    shape-rendering: crispEdges !important;
+    image-rendering: pixelated !important;
+    background-color: #ffffff !important;
+  }
+
+  body.is-printing-sticker .thermal-sticker-50x25 svg rect {
+    fill: #000000 !important;
+  }
+
+  body.is-printing-sticker .thermal-sticker-50x25 svg rect[fill="#ffffff"],
+  body.is-printing-sticker .thermal-sticker-50x25 svg rect[fill="white"] {
+    fill: #ffffff !important;
+  }
+
+  body.is-printing-sticker .thermal-sticker-50x25 span.bg-black {
+    background-color: #000000 !important;
+    color: #ffffff !important;
   }
 }
 

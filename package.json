@@ -15,6 +15,7 @@
     "html5-qrcode": "^2.3.8",
     "jose": "^6.2.12",
     "jsbarcode": "^3.12.3",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.49.0",
     "mysql2": "^3.24.5",
     "next": "16.3.7",

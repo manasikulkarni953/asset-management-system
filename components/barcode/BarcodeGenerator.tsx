@@ -15,6 +15,8 @@ export interface BarcodeGeneratorProps {
   textMargin?: number;
   className?: string;
   renderMode?: 'canvas' | 'svg';
+  background?: string;
+  lineColor?: string;
 }
 
 export function BarcodeGenerator({
@@ -27,6 +29,8 @@ export function BarcodeGenerator({
   textMargin,
   className,
   renderMode = 'canvas',
+  background = '#ffffff',
+  lineColor = '#000000',
 }: BarcodeGeneratorProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -40,12 +44,12 @@ export function BarcodeGenerator({
       height: Math.round(height || 90),
       displayValue,
       fontSize: fontSize || 15,
-      font: 'monospace',
+      font: 'Arial, sans-serif',
       fontOptions: 'bold',
       textMargin: textMargin !== undefined ? textMargin : 4,
-      margin: margin !== undefined ? margin : Math.max(10, DEFAULT_BARCODE_OPTIONS.margin ?? 24),
-      background: '#ffffff',
-      lineColor: '#000000',
+      margin: margin !== undefined ? margin : Math.max(6, DEFAULT_BARCODE_OPTIONS.margin ?? 10),
+      background: background || '#ffffff',
+      lineColor: lineColor || '#000000',
     };
 
     if (renderMode === 'canvas' && canvasRef.current) {
@@ -68,11 +72,27 @@ export function BarcodeGenerator({
     } else if (svgRef.current) {
       try {
         JsBarcode(svgRef.current, value.trim(), barcodeConfig);
+        const svg = svgRef.current;
+        svg.setAttribute('shape-rendering', 'crispEdges');
+        svg.style.backgroundColor = background || '#ffffff';
+        svg.style.shapeRendering = 'crispEdges';
+        
+        // Ensure every generated rect has crispEdges and correct monochrome fill
+        const rects = svg.querySelectorAll('rect');
+        rects.forEach((rect, idx) => {
+          rect.setAttribute('shape-rendering', 'crispEdges');
+          const fillAttr = rect.getAttribute('fill');
+          if (fillAttr === '#ffffff' || fillAttr === 'white' || idx === 0) {
+            rect.style.fill = background || '#ffffff';
+          } else {
+            rect.style.fill = lineColor || '#000000';
+          }
+        });
       } catch (err) {
         console.error('Barcode SVG render error:', err);
       }
     }
-  }, [value, width, height, displayValue, fontSize, renderMode, margin, textMargin]);
+  }, [value, width, height, displayValue, fontSize, renderMode, margin, textMargin, background, lineColor]);
 
   if (!value) {
     return (
@@ -85,10 +105,11 @@ export function BarcodeGenerator({
   return (
     <div
       className={cn(
-        'inline-flex flex-col items-center justify-center bg-white p-3 rounded-lg shadow-2xs select-none',
-        className
+        'inline-flex flex-col items-center justify-center select-none',
+        className !== undefined ? className : 'bg-white p-3 rounded-lg'
       )}
       style={{
+        backgroundColor: background || '#ffffff',
         imageRendering: 'pixelated',
       }}
     >
@@ -98,6 +119,7 @@ export function BarcodeGenerator({
           className="max-w-full h-auto block"
           style={{
             imageRendering: 'pixelated',
+            backgroundColor: background || '#ffffff',
           }}
         />
       ) : (
@@ -107,6 +129,8 @@ export function BarcodeGenerator({
           shapeRendering="crispEdges"
           style={{
             shapeRendering: 'crispEdges',
+            backgroundColor: background || '#ffffff',
+            display: 'block',
           }}
         />
       )}
