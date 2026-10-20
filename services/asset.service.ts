@@ -13,10 +13,83 @@ export interface AssetFilterOptions {
   limit?: number;
 }
 
+let schemaInitPromise: Promise<{ hasImportId: boolean; hasAssetImportsTable: boolean }> | null = null;
+let hasImportIdCached: boolean | null = null;
+let hasAssetImportsTableCached: boolean | null = null;
+
+async function ensureAssetImportsSchema(): Promise<{ hasImportId: boolean; hasAssetImportsTable: boolean }> {
+  if (hasImportIdCached !== null && hasAssetImportsTableCached !== null) {
+    return { hasImportId: hasImportIdCached, hasAssetImportsTable: hasAssetImportsTableCached };
+  }
+
+  if (schemaInitPromise) return schemaInitPromise;
+
+  schemaInitPromise = (async () => {
+    // 1. Ensure asset_imports table exists
+    try {
+      await query(`
+        CREATE TABLE IF NOT EXISTS asset_imports (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          filename VARCHAR(255) NOT NULL,
+          original_name VARCHAR(255) NOT NULL,
+          file_size INT NOT NULL DEFAULT 0,
+          file_content MEDIUMTEXT NULL,
+          total_records INT NOT NULL DEFAULT 0,
+          success_count INT NOT NULL DEFAULT 0,
+          failed_count INT NOT NULL DEFAULT 0,
+          status ENUM('completed', 'failed', 'partial') DEFAULT 'completed',
+          imported_by_user_id INT NULL,
+          imported_by_name VARCHAR(100) NULL,
+          error_log TEXT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_imports_date (created_at)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+      hasAssetImportsTableCached = true;
+    } catch (err: any) {
+      console.warn('[AssetService] Auto-create asset_imports table notice:', err?.message || err);
+      hasAssetImportsTableCached = false;
+    }
+
+    // 2. Ensure import_id column exists on assets table
+    try {
+      const cols = await query<any>(`SHOW COLUMNS FROM assets LIKE 'import_id'`);
+      if (!cols || cols.length === 0) {
+        try {
+          await query(`ALTER TABLE assets ADD COLUMN import_id INT NULL AFTER current_employee_id`);
+          try {
+            await query(`ALTER TABLE assets ADD INDEX idx_assets_import_id (import_id)`);
+          } catch {
+            // ignore index warning
+          }
+          hasImportIdCached = true;
+        } catch (alterErr: any) {
+          console.warn('[AssetService] Auto-add import_id column notice:', alterErr?.message || alterErr);
+          hasImportIdCached = false;
+        }
+      } else {
+        hasImportIdCached = true;
+      }
+    } catch (colErr: any) {
+      console.warn('[AssetService] Check import_id column notice:', colErr?.message || colErr);
+      hasImportIdCached = false;
+    }
+
+    return {
+      hasImportId: Boolean(hasImportIdCached),
+      hasAssetImportsTable: Boolean(hasAssetImportsTableCached),
+    };
+  })();
+
+  return schemaInitPromise;
+}
+
 export class AssetService {
   static async getAssets(options: AssetFilterOptions = {}): Promise<{ assets: Asset[]; total: number }> {
     const { search, category, status, employeeId, importId, page = 1, limit = 20 } = options;
     const offset = (page - 1) * limit;
+
+    const { hasImportId, hasAssetImportsTable } = await ensureAssetImportsSchema();
 
     const conditions: string[] = ['1=1'];
     const params: any[] = [];
@@ -50,58 +123,139 @@ export class AssetService {
       params.push(employeeId);
     }
 
-    if (importId) {
-      conditions.push('a.import_id = ?');
-      params.push(importId);
-    } else {
-      conditions.push('a.import_id IS NULL');
+    if (hasImportId) {
+      if (importId) {
+        conditions.push('a.import_id = ?');
+        params.push(importId);
+      } else {
+        conditions.push('a.import_id IS NULL');
+      }
     }
 
     const whereClause = conditions.join(' AND ');
 
-    const countRows = await query<any>(
-      `SELECT COUNT(*) as total 
-       FROM assets a 
-       LEFT JOIN employee e ON a.current_employee_id = e.id
-       WHERE ${whereClause}`,
-      params
-    );
-    const total = countRows[0]?.total || 0;
+    try {
+      const countRows = await query<any>(
+        `SELECT COUNT(*) as total 
+         FROM assets a 
+         LEFT JOIN employee e ON a.current_employee_id = e.id
+         WHERE ${whereClause}`,
+        params
+      );
+      const total = countRows[0]?.total || 0;
 
-    const assets = await query<Asset>(
-      `SELECT 
-        a.id,
-        a.asset_id,
-        a.asset_number,
-        a.category,
-        a.brand,
-        a.model,
-        a.serial_number,
-        a.purchase_date,
-        a.purchase_cost,
-        a.vendor,
-        a.vendor_phone,
-        a.vendor_email,
-        a.location,
-        a.warranty_expiry,
-        a.status,
-        a.current_employee_id,
-        COALESCE(e.name, e.full_name) as current_employee_name,
-        COALESCE(e.employee_id, CONCAT('TGS-', LPAD(e.id, 3, '0'))) as current_employee_code,
-        a.import_id,
-        ai.original_name as import_filename,
-        a.created_at,
-        a.updated_at
-       FROM assets a
-       LEFT JOIN employee e ON a.current_employee_id = e.id
-       LEFT JOIN asset_imports ai ON a.import_id = ai.id
-       WHERE ${whereClause}
-       ORDER BY a.id DESC
-       LIMIT ? OFFSET ?`,
-      [...params, Number(limit), Number(offset)]
-    );
+      const canJoinImports = hasImportId && hasAssetImportsTable;
 
-    return { assets, total };
+      const assets = await query<Asset>(
+        `SELECT 
+          a.id,
+          a.asset_id,
+          a.asset_number,
+          a.category,
+          a.brand,
+          a.model,
+          a.serial_number,
+          a.purchase_date,
+          a.purchase_cost,
+          a.vendor,
+          a.vendor_phone,
+          a.vendor_email,
+          a.location,
+          a.warranty_expiry,
+          a.status,
+          a.current_employee_id,
+          COALESCE(e.name, e.full_name) as current_employee_name,
+          COALESCE(e.employee_id, CONCAT('TGS-', LPAD(e.id, 3, '0'))) as current_employee_code,
+          ${canJoinImports ? 'a.import_id, ai.original_name as import_filename,' : 'NULL as import_id, NULL as import_filename,'}
+          a.created_at,
+          a.updated_at
+         FROM assets a
+         LEFT JOIN employee e ON a.current_employee_id = e.id
+         ${canJoinImports ? 'LEFT JOIN asset_imports ai ON a.import_id = ai.id' : ''}
+         WHERE ${whereClause}
+         ORDER BY a.id DESC
+         LIMIT ? OFFSET ?`,
+        [...params, Number(limit), Number(offset)]
+      );
+
+      return { assets, total };
+    } catch (queryErr: any) {
+      // Fallback: If table or column is missing on production database (e.g. Hostinger/Vercel)
+      const isMissingSchema =
+        queryErr?.code === 'ER_BAD_FIELD_ERROR' ||
+        queryErr?.code === 'ER_NO_SUCH_TABLE' ||
+        queryErr?.message?.includes('import_id') ||
+        queryErr?.message?.includes('asset_imports');
+
+      if (isMissingSchema) {
+        console.warn('[AssetService] Schema fallback triggered for getAssets:', queryErr?.message);
+        hasImportIdCached = false;
+        hasAssetImportsTableCached = false;
+
+        const fbConditions: string[] = ['1=1'];
+        const fbParams: any[] = [];
+        if (search && search.trim() !== '') {
+          fbConditions.push(
+            '(a.asset_id LIKE ? OR a.asset_number LIKE ? OR a.brand LIKE ? OR a.model LIKE ? OR a.serial_number LIKE ?)'
+          );
+          const sp = `%${search.trim()}%`;
+          fbParams.push(sp, sp, sp, sp, sp);
+        }
+        if (category && category !== 'all') {
+          fbConditions.push('a.category = ?');
+          fbParams.push(category);
+        }
+        if (status && status !== 'all') {
+          fbConditions.push('a.status = ?');
+          fbParams.push(status);
+        }
+        if (employeeId) {
+          fbConditions.push('a.current_employee_id = ?');
+          fbParams.push(employeeId);
+        }
+
+        const fbWhere = fbConditions.join(' AND ');
+        const countRows = await query<any>(
+          `SELECT COUNT(*) as total FROM assets a WHERE ${fbWhere}`,
+          fbParams
+        );
+        const assets = await query<Asset>(
+          `SELECT 
+            a.id,
+            a.asset_id,
+            a.asset_number,
+            a.category,
+            a.brand,
+            a.model,
+            a.serial_number,
+            a.purchase_date,
+            a.purchase_cost,
+            a.vendor,
+            a.vendor_phone,
+            a.vendor_email,
+            a.location,
+            a.warranty_expiry,
+            a.status,
+            a.current_employee_id,
+            COALESCE(e.name, e.full_name) as current_employee_name,
+            COALESCE(e.employee_id, CONCAT('TGS-', LPAD(e.id, 3, '0'))) as current_employee_code,
+            NULL as import_id,
+            NULL as import_filename,
+            a.created_at,
+            a.updated_at
+           FROM assets a
+           LEFT JOIN employee e ON a.current_employee_id = e.id
+           WHERE ${fbWhere}
+           ORDER BY a.id DESC
+           LIMIT ? OFFSET ?`,
+          [...fbParams, Number(limit), Number(offset)]
+        );
+
+        return { assets, total: countRows[0]?.total || 0 };
+      }
+
+      throw queryErr;
+    }
   }
 
   static async getAssetById(id: number): Promise<AssetDetailed | null> {
@@ -266,32 +420,61 @@ export class AssetService {
 
       const initialStatus = data.current_employee_id ? 'assigned' : (data.status || 'in_stock');
 
-      // 4. Insert asset with both generated asset_id and asset_number
-      const [res] = await conn.execute(
-        `INSERT INTO assets (
-          asset_id, asset_number, category, brand, model, serial_number, 
-          purchase_date, purchase_cost, vendor, vendor_phone, vendor_email, location,
-          warranty_expiry, status, current_employee_id, import_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          assetId,
-          assetNumber,
-          data.category.trim(),
-          data.brand.trim(),
-          data.model.trim(),
-          trimmedSerial,
-          data.purchase_date,
-          data.purchase_cost,
-          data.vendor.trim(),
-          data.vendor_phone ? data.vendor_phone.trim() : null,
-          data.vendor_email ? data.vendor_email.trim() : null,
-          data.location ? data.location.trim() : 'The Space',
-          data.warranty_expiry || null,
-          initialStatus,
-          data.current_employee_id || null,
-          importId || null,
-        ]
-      );
+      const { hasImportId } = await ensureAssetImportsSchema();
+
+      let res: any;
+      if (hasImportId) {
+        [res] = await conn.execute(
+          `INSERT INTO assets (
+            asset_id, asset_number, category, brand, model, serial_number, 
+            purchase_date, purchase_cost, vendor, vendor_phone, vendor_email, location,
+            warranty_expiry, status, current_employee_id, import_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            assetId,
+            assetNumber,
+            data.category.trim(),
+            data.brand.trim(),
+            data.model.trim(),
+            trimmedSerial,
+            data.purchase_date,
+            data.purchase_cost,
+            data.vendor.trim(),
+            data.vendor_phone ? data.vendor_phone.trim() : null,
+            data.vendor_email ? data.vendor_email.trim() : null,
+            data.location ? data.location.trim() : 'The Space',
+            data.warranty_expiry || null,
+            initialStatus,
+            data.current_employee_id || null,
+            importId || null,
+          ]
+        );
+      } else {
+        [res] = await conn.execute(
+          `INSERT INTO assets (
+            asset_id, asset_number, category, brand, model, serial_number, 
+            purchase_date, purchase_cost, vendor, vendor_phone, vendor_email, location,
+            warranty_expiry, status, current_employee_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            assetId,
+            assetNumber,
+            data.category.trim(),
+            data.brand.trim(),
+            data.model.trim(),
+            trimmedSerial,
+            data.purchase_date,
+            data.purchase_cost,
+            data.vendor.trim(),
+            data.vendor_phone ? data.vendor_phone.trim() : null,
+            data.vendor_email ? data.vendor_email.trim() : null,
+            data.location ? data.location.trim() : 'The Space',
+            data.warranty_expiry || null,
+            initialStatus,
+            data.current_employee_id || null,
+          ]
+        );
+      }
 
       const internalId = (res as any).insertId;
 
@@ -499,6 +682,8 @@ export class AssetService {
       throw new Error('No asset rows provided in the file to import.');
     }
 
+    await ensureAssetImportsSchema();
+
     // 1. Create asset_imports record with completed status and full spreadsheet content
     // Kept separate from the main assets inventory table so uploaded files only appear in View File
     const insertImportRes = await execute(
@@ -531,37 +716,64 @@ export class AssetService {
   }
 
   static async getImportHistory(): Promise<any[]> {
-    return query(
-      `SELECT 
-        id,
-        filename,
-        original_name,
-        file_size,
-        total_records,
-        success_count,
-        failed_count,
-        status,
-        imported_by_user_id,
-        imported_by_name,
-        error_log,
-        created_at
-       FROM asset_imports
-       ORDER BY id DESC`
-    );
+    await ensureAssetImportsSchema();
+    try {
+      return await query(
+        `SELECT 
+          id,
+          filename,
+          original_name,
+          file_size,
+          total_records,
+          success_count,
+          failed_count,
+          status,
+          imported_by_user_id,
+          imported_by_name,
+          error_log,
+          created_at
+         FROM asset_imports
+         ORDER BY id DESC`
+      );
+    } catch (error: any) {
+      if (
+        error?.code === 'ER_NO_SUCH_TABLE' ||
+        error?.message?.includes("doesn't exist") ||
+        error?.message?.includes('asset_imports')
+      ) {
+        console.warn('[AssetService] asset_imports table does not exist in production database. Returning empty array.');
+        return [];
+      }
+      throw error;
+    }
   }
 
   static async getImportById(id: number): Promise<any | null> {
-    const rows = await query<any>(
-      `SELECT * FROM asset_imports WHERE id = ? LIMIT 1`,
-      [id]
-    );
-    return rows && rows.length > 0 ? rows[0] : null;
+    await ensureAssetImportsSchema();
+    try {
+      const rows = await query<any>(
+        `SELECT * FROM asset_imports WHERE id = ? LIMIT 1`,
+        [id]
+      );
+      return rows && rows.length > 0 ? rows[0] : null;
+    } catch (error: any) {
+      if (
+        error?.code === 'ER_NO_SUCH_TABLE' ||
+        error?.message?.includes("doesn't exist") ||
+        error?.message?.includes('asset_imports')
+      ) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   static async deleteImportBatch(
     importId: number,
     deleteAssets: boolean = true
   ): Promise<{ success: boolean; deletedAssetsCount: number; message: string }> {
+    const { hasImportId } = await ensureAssetImportsSchema();
+
     return withTransaction(async (conn) => {
       const [importRows]: any = await conn.execute(
         'SELECT id, filename, original_name FROM asset_imports WHERE id = ?',
@@ -571,26 +783,28 @@ export class AssetService {
         throw new Error('Import batch record not found');
       }
 
-      const [assetRows]: any = await conn.execute(
-        'SELECT id FROM assets WHERE import_id = ?',
-        [importId]
-      );
-      const assetIds: number[] = (assetRows || []).map((r: any) => r.id);
-
       let deletedAssetsCount = 0;
 
-      if (deleteAssets && assetIds.length > 0) {
-        for (const assetId of assetIds) {
-          await conn.execute('DELETE FROM asset_network WHERE asset_id = ?', [assetId]);
-          await conn.execute('DELETE FROM asset_insurance WHERE asset_id = ?', [assetId]);
-          await conn.execute('UPDATE tickets SET asset_id = NULL WHERE asset_id = ?', [assetId]);
-          await conn.execute('DELETE FROM asset_assignments WHERE asset_id = ?', [assetId]);
-          await conn.execute('DELETE FROM asset_history WHERE asset_id = ?', [assetId]);
-          await conn.execute('DELETE FROM assets WHERE id = ?', [assetId]);
+      if (hasImportId) {
+        const [assetRows]: any = await conn.execute(
+          'SELECT id FROM assets WHERE import_id = ?',
+          [importId]
+        );
+        const assetIds: number[] = (assetRows || []).map((r: any) => r.id);
+
+        if (deleteAssets && assetIds.length > 0) {
+          for (const assetId of assetIds) {
+            await conn.execute('DELETE FROM asset_network WHERE asset_id = ?', [assetId]);
+            await conn.execute('DELETE FROM asset_insurance WHERE asset_id = ?', [assetId]);
+            await conn.execute('UPDATE tickets SET asset_id = NULL WHERE asset_id = ?', [assetId]);
+            await conn.execute('DELETE FROM asset_assignments WHERE asset_id = ?', [assetId]);
+            await conn.execute('DELETE FROM asset_history WHERE asset_id = ?', [assetId]);
+            await conn.execute('DELETE FROM assets WHERE id = ?', [assetId]);
+          }
+          deletedAssetsCount = assetIds.length;
+        } else if (!deleteAssets && assetIds.length > 0) {
+          await conn.execute('UPDATE assets SET import_id = NULL WHERE import_id = ?', [importId]);
         }
-        deletedAssetsCount = assetIds.length;
-      } else if (!deleteAssets && assetIds.length > 0) {
-        await conn.execute('UPDATE assets SET import_id = NULL WHERE import_id = ?', [importId]);
       }
 
       await conn.execute('DELETE FROM asset_imports WHERE id = ?', [importId]);

@@ -56,13 +56,33 @@ CREATE TABLE IF NOT EXISTS `assets` (
   `warranty_expiry` DATE NULL,
   `status` ENUM('in_stock', 'assigned', 'under_maintenance', 'retired') NOT NULL DEFAULT 'in_stock',
   `current_employee_id` INT NULL,
+  `import_id` INT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT `uq_assets_asset_id` UNIQUE (`asset_id`),
   CONSTRAINT `fk_assets_employee` FOREIGN KEY (`current_employee_id`) REFERENCES `employees` (`id`) ON DELETE SET NULL,
   INDEX `idx_assets_category` (`category`),
   INDEX `idx_assets_status` (`status`),
-  INDEX `idx_assets_brand` (`brand`)
+  INDEX `idx_assets_brand` (`brand`),
+  INDEX `idx_assets_import_id` (`import_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- 3.1 ASSET IMPORTS TABLE (Stores batch file imports & spreadsheet content)
+CREATE TABLE IF NOT EXISTS `asset_imports` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `filename` VARCHAR(255) NOT NULL,
+  `original_name` VARCHAR(255) NOT NULL,
+  `file_size` INT NOT NULL DEFAULT 0,
+  `file_content` MEDIUMTEXT NULL,
+  `total_records` INT NOT NULL DEFAULT 0,
+  `success_count` INT NOT NULL DEFAULT 0,
+  `failed_count` INT NOT NULL DEFAULT 0,
+  `status` ENUM('completed', 'failed', 'partial') DEFAULT 'completed',
+  `imported_by_user_id` INT NULL,
+  `imported_by_name` VARCHAR(100) NULL,
+  `error_log` TEXT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX `idx_imports_date` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. ASSET ASSIGNMENTS TABLE
